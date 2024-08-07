@@ -7,17 +7,6 @@
 #include <sstream>  // Para std::ostringstream
 
 // Función para leer el contenido de un archivo
-/*
-    readFile(const std::string& filename): Lee el contenido de un archivo y lo devuelve como una cadena.
-
-    filename: El nombre del archivo que se desea leer.
-
-    std::ifstream file(filename.c_str()): Abre el archivo para lectura usando c_str() para convertir std::string a const char*.
-
-    if (!file): Verifica si el archivo se abrió correctamente.
-
-    std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>()): Lee todo el contenido del archivo en una cadena.
-*/
 std::string readFile(const std::string& filename) {
     std::ifstream file(filename.c_str());
     if (!file) {
@@ -53,6 +42,7 @@ int main() {
         sin_addr.s_addr = INADDR_ANY: Indica que el socket debe aceptar conexiones de cualquier interfaz de red.
 
         sin_port = htons(8080): Especifica el puerto en el que el servidor escuchará, convertido a formato de red con htons (Host to Network Short).
+
     */
     sockaddr_in serverAddress;
     serverAddress.sin_family = AF_INET;
@@ -65,6 +55,7 @@ int main() {
     */
     if (bind(serverSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1) {
         std::cerr << "Error al vincular el socket." << std::endl;
+        close(serverSocket);
         return 1;
     }
 
@@ -76,6 +67,7 @@ int main() {
     */
     if (listen(serverSocket, 5) == -1) {
         std::cerr << "Error al escuchar por conexiones entrantes." << std::endl;
+        close(serverSocket);
         return 1;
     }
 
@@ -123,45 +115,46 @@ int main() {
         std::cout << "Solicitud del cliente:" << std::endl;
         std::cout << buffer << std::endl;
 
-        // Leer el contenido del archivo HTML
-        /*
-            std::string htmlContent = readFile("index.html"): Lee el contenido del archivo HTML.
+        // Crear la respuesta HTTP
+        std::string response;
+        std::string requestedFile;
 
-            Si el archivo no se puede abrir, se envía una respuesta de error HTTP 500.
-        */
-        std::string htmlContent = readFile("index.html");
-        if (htmlContent.empty()) {
-            std::string errorResponse = "HTTP/1.1 500 Internal Server Error\r\n"
-                                        "Content-Type: text/plain\r\n"
-                                        "Content-Length: 0\r\n\r\n";
-            send(clientSocket, errorResponse.c_str(), errorResponse.length(), 0);
-            close(clientSocket);
-            continue;
+        // Parsear la solicitud para obtener el archivo solicitado
+        std::string request(buffer);
+        size_t pos = request.find("GET /");
+        if (pos != std::string::npos) {
+            pos += 5; // Move past "GET /"
+            size_t endPos = request.find(" ", pos);
+            requestedFile = request.substr(pos, endPos - pos);
         }
 
-        // Crear la respuesta HTTP
-        /*
-            std::string response: La respuesta HTTP que se enviará al cliente.
+        // Si la solicitud es para el archivo index.html
+        if (requestedFile == "index.html") {
+            // Leer el contenido del archivo HTML
+            std::string htmlContent = readFile("index.html");
+            if (htmlContent.empty()) {
+                response = "HTTP/1.1 500 Internal Server Error\r\n"
+                           "Content-Type: text/plain\r\n"
+                           "Content-Length: 0\r\n\r\n";
+            } else {
+                std::ostringstream contentLength;
+                contentLength << htmlContent.size();
 
-            send(clientSocket, response.c_str(), response.length(), 0): Envía datos al socket del cliente.
+                response = "HTTP/1.1 200 OK\r\n";
+                response += "Content-Type: text/html\r\n";
+                response += "Content-Length: " + contentLength.str() + "\r\n";
+                response += "\r\n";
+                response += htmlContent;
+            }
+        } else {
+            // Respuesta por defecto para otras solicitudes
+            response = "HTTP/1.1 200 OK\r\n"
+                       "Content-Type: text/plain\r\n"
+                       "Content-Length: 12\r\n\r\n"
+                       "Hello World!";
+        }
 
-            clientSocket: El descriptor de archivo del socket del cliente.
-
-            response.c_str(): Un puntero a los datos que se van a enviar.
-
-            response.length(): El tamaño de los datos a enviar.
-
-            0: Flags adicionales (ninguna en este caso).
-        */
-        std::ostringstream contentLength;
-        contentLength << htmlContent.size();
-
-        std::string response = "HTTP/1.1 200 OK\r\n";
-        response += "Content-Type: text/html\r\n";
-        response += "Content-Length: " + contentLength.str() + "\r\n";
-        response += "\r\n";
-        response += htmlContent;
-
+        // Enviar la respuesta al cliente
         ssize_t bytesSent = send(clientSocket, response.c_str(), response.length(), 0);
         if (bytesSent == -1) {
             std::cerr << "Error al enviar la respuesta al cliente." << std::endl;
