@@ -129,8 +129,14 @@ int main() {
         }
 
         // Si la solicitud es para el archivo index.html
-        if (requestedFile == "index.html") {
-            // Leer el contenido del archivo HTML
+        if (requestedFile.empty() || requestedFile == "/") {
+            response = "HTTP/1.1 200 OK\r\n";
+            response += "Content-Type: text/html\r\n";
+            response += "Content-Length: 13\r\n"; // Longitud de "Hello, World!"
+            response += "\r\n";
+            response += "Hello, World!";
+        } else if (requestedFile == "index.html") {
+            // Si la solicitud es para index.html, servir el contenido de index.html
             std::string htmlContent = readFile("index.html");
             if (htmlContent.empty()) {
                 response = "HTTP/1.1 500 Internal Server Error\r\n"
@@ -147,11 +153,22 @@ int main() {
                 response += htmlContent;
             }
         } else {
-            // Respuesta por defecto para otras solicitudes
-            response = "HTTP/1.1 200 OK\r\n"
-                       "Content-Type: text/plain\r\n"
-                       "Content-Length: 12\r\n\r\n"
-                       "Hello World!";
+            // Si la solicitud no es para index.html ni la ruta raíz, servir el archivo de error 500
+            std::string errorContent = readFile("500.html");
+            if (errorContent.empty()) {
+                response = "HTTP/1.1 500 Internal Server Error\r\n"
+                           "Content-Type: text/plain\r\n"
+                           "Content-Length: 0\r\n\r\n";
+            } else {
+                std::ostringstream contentLength;
+                contentLength << errorContent.size();
+
+                response = "HTTP/1.1 500 Internal Server Error\r\n";
+                response += "Content-Type: text/html\r\n";
+                response += "Content-Length: " + contentLength.str() + "\r\n";
+                response += "\r\n";
+                response += errorContent;
+            }
         }
 
         // Enviar la respuesta al cliente
