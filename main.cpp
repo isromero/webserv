@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   main.cpp                                           :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2024/08/08 21:29:30 by isromero          #+#    #+#             */
+/*   Updated: 2024/08/08 21:29:30 by isromero         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include <iostream>
 #include <string>
 #include <sys/socket.h>
@@ -59,7 +71,7 @@ int main()
 	while (1)
 	{
 		// Accept the incoming connection
-		int clientSocket = accept(socketfd, (struct sockaddr *)&serverAddress, sizeof(serverAddress));
+		int clientSocket = accept(socketfd, (struct sockaddr *)&serverAddress, (socklen_t *)&serverAddress);
 		if (clientSocket == -1)
 		{
 			std::cerr << "Error: accepting the incoming connection" << std::endl;
@@ -68,7 +80,7 @@ int main()
 		}
 
 		// Read the request from the client the request is stored in the buffer
-		std::string requestData;
+		std::string request;
 		char buffer[1024];
 		ssize_t bytesRead;
 
