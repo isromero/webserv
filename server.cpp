@@ -47,7 +47,7 @@ int main() {
     sockaddr_in serverAddress;
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_addr.s_addr = INADDR_ANY;
-    serverAddress.sin_port = htons(8080);
+    serverAddress.sin_port = htons(6969);
 
     // Vincular el socket a la dirección del servidor
     /*
@@ -135,7 +135,9 @@ int main() {
             response += "Content-Length: 13\r\n"; // Longitud de "Hello, World!"
             response += "\r\n";
             response += "Hello, World!";
-        } else if (requestedFile == "index.html") {
+        } 
+        else if (requestedFile == "index.html") 
+        {
             // Si la solicitud es para index.html, servir el contenido de index.html
             std::string htmlContent = readFile("index.html");
             if (htmlContent.empty()) {
@@ -154,9 +156,9 @@ int main() {
             }
         } else {
             // Si la solicitud no es para index.html ni la ruta raíz, servir el archivo de error 500
-            std::string errorContent = readFile("500.html");
+            std::string errorContent = readFile("404.html");
             if (errorContent.empty()) {
-                response = "HTTP/1.1 500 Internal Server Error\r\n"
+                response = "HTTP/1.1 404 Not Found\r\n"
                            "Content-Type: text/plain\r\n"
                            "Content-Length: 0\r\n\r\n";
             } else {
