@@ -9,6 +9,11 @@
 [Un servidor HTTP en 25 líneas](https://www.youtube.com/watch?v=7GBlCinu9yg)
 
 [42 Seoul tutorial](https://42seoul.gitbook.io/webserv/or-cgi-execute)
+
+[epoll tutorial/epoll vs poll vs select](https://www.suchprogramming.com/epoll-in-3-easy-steps/)
+
+[crear un server con epoll en c](https://unscriptedcoding.medium.com/multithreaded-server-in-c-using-epoll-baadad32224c)
+
 ## Relación entre IPC y Sockets
 
 - Sockets como IPC: Los sockets son una de las muchas formas en las que los procesos pueden comunicarse entre sí, por lo que se consideran una herramienta de IPC. Son especialmente útiles cuando los procesos no están en la misma máquina o cuando se necesita comunicación a través de una red.
