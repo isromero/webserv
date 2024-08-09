@@ -17,20 +17,18 @@
 #include <unistd.h>
 #include <fstream>
 #include <sstream>
+#include <cerrno>
 
-// Función para leer el contenido de un archivo
 std::string readFile(const std::string &filename)
 {
 	std::ifstream file(filename.c_str());
 	if (!file)
 	{
-		std::cerr << "Error al abrir el archivo: " << filename << std::endl;
+		std::cerr << "Error: opening the file: " << filename << ": " << std::strerror(errno) << std::endl;
 		return "";
 	}
 	return std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 }
-
-// TODO: Change errors for strrerror and gai_strerror?
 
 int main()
 {
@@ -40,7 +38,7 @@ int main()
 	int socketfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (socketfd == -1)
 	{
-		std::cerr << "Error: creating the socket" << std::endl;
+		std::cerr << "Error: creating the socket: " << std::strerror(errno) << std::endl;
 		return (1);
 	}
 
@@ -48,13 +46,13 @@ int main()
 	sockaddr_in serverAddress;
 
 	serverAddress.sin_family = AF_INET;
-	serverAddress.sin_addr.s_addr = INADDR_ANY;
-	serverAddress.sin_port = htons(6969); // htons converts the port number to network byte order
+	serverAddress.sin_addr.s_addr = INADDR_ANY; // TODO: Think if we want to do the server with Ipv4 and Ipv6(we need to use addrinfo, gai_strerror...)
+	serverAddress.sin_port = htons(6969);		// htons converts the port number to network byte order
 
 	// Bind the socket to the address and port
 	if (bind(socketfd, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) == -1)
 	{
-		std::cerr << "Error: binding the socket to the address" << std::endl;
+		std::cerr << "Error: binding the socket to the address and port: " << std::strerror(errno) << std::endl;
 		close(socketfd);
 		return (1);
 	}
@@ -62,7 +60,7 @@ int main()
 	// Listen for incoming connections, 1000 is the maximum queue length
 	if (listen(socketfd, 1000) < 0)
 	{
-		std::cerr << "Error: listening for incoming connections" << std::endl;
+		std::cerr << "Error: listening for incoming connections: " << std::strerror(errno) << std::endl;
 		close(socketfd);
 		return (1);
 	}
@@ -74,7 +72,7 @@ int main()
 		int clientSocket = accept(socketfd, (struct sockaddr *)&serverAddress, (socklen_t *)&serverAddress);
 		if (clientSocket == -1)
 		{
-			std::cerr << "Error: accepting the incoming connection" << std::endl;
+			std::cerr << "Error: accepting the incoming connection: " << std::strerror(errno) << std::endl;
 			close(clientSocket);
 			continue;
 		}
@@ -164,7 +162,7 @@ int main()
 		// Send the response
 		ssize_t bytesSent = send(clientSocket, response.c_str(), response.size(), 0);
 		if (bytesSent == -1)
-			std::cerr << "Error: sending the response" << std::endl;
+			std::cerr << "Error: sending the response: " << std::strerror(errno) << std::endl;
 		else
 		{
 			std::cout << "Response:" << std::endl;
