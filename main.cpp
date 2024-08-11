@@ -80,6 +80,7 @@ int main()
 
 	// Add the server socket to the epoll instance
 	struct epoll_event event, events[MAX_EVENTS];
+	memset(&event, 0, sizeof(event));
 	event.events = EPOLLIN;
 	event.data.fd = serverfd;
 	if (epoll_ctl(epollfd, EPOLL_CTL_ADD, serverfd, &event) == -1)
@@ -117,6 +118,7 @@ int main()
 				}
 
 				// Add the client socket to the epoll instance
+				memset(&event, 0, sizeof(event));
 				event.events = EPOLLIN;
 				event.data.fd = clientfd;
 				if (epoll_ctl(epollfd, EPOLL_CTL_ADD, clientfd, &event) == -1)
@@ -179,6 +181,7 @@ int main()
 				else if (requestedFile == "index.html")
 				{
 					std::string htmlContent = readFile("index.html");
+					
 					if (htmlContent.empty())
 					{
 						response = "HTTP/1.0 500 Internal Server Error\r\n"
