@@ -20,6 +20,8 @@
 #include <cerrno>
 #include <sys/epoll.h>
 #include <cstring>
+#include <fcntl.h>
+#include <sstream>
 
 #define MAX_CLIENTS 10000
 #define MAX_EVENTS 10000
@@ -27,12 +29,109 @@
 std::string readFile(const std::string &filename)
 {
 	std::ifstream file(filename.c_str());
-	if (!file)
+	if (!file.is_open())
 	{
-		std::cerr << "Error: opening the file: " << filename << ": " << strerror(errno) << std::endl;
+		std::cerr << "Error: opening the file: " << strerror(errno) << std::endl;
 		return "";
 	}
-	return std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+	std::stringstream buffer;
+	buffer << file.rdbuf();
+	file.close();
+	return buffer.str();
+}
+
+std::string determineContentType(const std::string &file)
+{
+	if (file.find(".html") != std::string::npos)
+		return "text/html";
+	else if (file.find(".css") != std::string::npos)
+		return "text/css";
+	else if (file.find(".js") != std::string::npos)
+		return "application/javascript";
+	else if (file.find(".jpg") != std::string::npos)
+		return "image/jpeg";
+	else if (file.find(".png") != std::string::npos)
+		return "image/png";
+	else if (file.find(".gif") != std::string::npos)
+		return "image/gif";
+	else if (file.find(".ico") != std::string::npos)
+		return "image/x-icon";
+	else
+		return "text/plain";
+}
+
+std::string handleGetRequest(const std::string &requestedFile)
+{
+	std::string response;
+	std::string file;
+	std::string status;
+
+	if (requestedFile == "/")
+	{
+		file = "pages/index.html";
+		status = "200 OK";
+	}
+	else
+	{
+		file = "pages" + requestedFile;
+
+		if (file.find(".html") == std::string::npos)
+			file += ".html";
+		if (open(file.c_str(), O_RDONLY) == -1)
+		{
+			status = "404 Not Found";
+			file = "pages/404.html";
+		}
+		else
+			status = "200 OK";
+	}
+	std::string fileContent = readFile(file);
+	std::ostringstream ss;
+	ss << fileContent.size();
+	std::string contentType = determineContentType(file);
+	response = "HTTP/1.1 " + status + "\r\n" +
+			    "Content-Type: " +
+			   contentType + "\r\n" +
+			   "Content-Length: " +
+			   ss.str() + "\r\n\r\n" + fileContent;
+
+	return response;
+}
+
+std::string handleMethod(const std::string &request)
+{
+	std::string response;
+	std::string method;
+	std::string requestedFile;
+
+	size_t methodEnd = request.find(" ");
+	if (methodEnd != std::string::npos)
+	{
+		method = request.substr(0, methodEnd);
+		size_t fileStart = request.find("/", methodEnd);
+		size_t fileEnd = request.find(" ", fileStart + 1);
+		if (fileStart != std::string::npos && fileEnd != std::string::npos)
+			requestedFile = request.substr(fileStart, fileEnd - fileStart);
+	}
+
+	if (method == "GET")
+		response = handleGetRequest(requestedFile);
+	// else if (method == "POST")
+	// {
+	// 	response = handlePostRequest();
+	// }
+	// else if (method == "DELETE")
+	// {
+	// 	response = handleDeleteRequest();
+	// }
+	// else
+	// {
+	// 	response = "HTTP/1.0 405 Method Not Allowed\r\n"
+	// 			   "Content-Type: text/plain\r\n"
+	// 			   "Content-Length: 0\r\n\r\n";
+	// }
+
+	return response;
 }
 
 int main()
@@ -160,67 +259,7 @@ int main()
 				std::cout << "Request:" << std::endl;
 				std::cout << request << std::endl;
 
-				std::string response;
-				std::string requestedFile;
-				size_t pos = request.find("GET /");
-				if (pos != std::string::npos)
-				{
-					pos += 5;
-					size_t endPos = request.find(" ", pos);
-					requestedFile = request.substr(pos, endPos - pos);
-				}
-
-				if (requestedFile.empty() || requestedFile == "/")
-				{
-					response = "HTTP/1.0 200 OK\r\n";
-					response += "Content-Type: text/html\r\n";
-					response += "Content-Length: 13\r\n";
-					response += "\r\n";
-					response += "Hello, World!";
-				}
-				else if (requestedFile == "index.html")
-				{
-					std::string htmlContent = readFile("index.html");
-					
-					if (htmlContent.empty())
-					{
-						response = "HTTP/1.0 500 Internal Server Error\r\n"
-								   "Content-Type: text/plain\r\n"
-								   "Content-Length: 0\r\n\r\n";
-					}
-					else
-					{
-						std::ostringstream contentLength;
-						contentLength << htmlContent.size();
-
-						response = "HTTP/1.0 200 OK\r\n";
-						response += "Content-Type: text/html\r\n";
-						response += "Content-Length: " + contentLength.str() + "\r\n";
-						response += "\r\n";
-						response += htmlContent;
-					}
-				}
-				else
-				{
-					std::string errorContent = readFile("404.html");
-					if (errorContent.empty())
-					{
-						response = "HTTP/1.0 404 Not Found\r\n"
-								   "Content-Type: text/plain\r\n"
-								   "Content-Length: 0\r\n\r\n";
-					}
-					else
-					{
-						std::ostringstream contentLength;
-						contentLength << errorContent.size();
-
-						response = "HTTP/1.0 500 Internal Server Error\r\n";
-						response += "Content-Type: text/html\r\n";
-						response += "Content-Length: " + contentLength.str() + "\r\n";
-						response += "\r\n";
-						response += errorContent;
-					}
-				}
+				std::string response = handleMethod(request);
 
 				ssize_t bytesSent = send(clientfd, response.c_str(), response.size(), 0);
 				if (bytesSent == -1)
