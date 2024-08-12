@@ -63,7 +63,7 @@ void Server::runLinux()
 	}
 
 	struct epoll_event event, events[MAX_EVENTS];
-	memset(&event, 0, sizeof(event)); // TODO: Check with valgrind if this is necessary
+	memset(&event, 0, sizeof(event));
 	event.events = EPOLLIN;
 	event.data.fd = this->_serverfd;
 	if (epoll_ctl(epollfd, EPOLL_CTL_ADD, this->_serverfd, &event) == -1)
@@ -93,9 +93,8 @@ void Server::runLinux()
 			if (events[i].data.fd == this->_serverfd)
 			{
 				int clientfd = this->_acceptClient();
-
 				// Add the client socket to the epoll instance
-				memset(&event, 0, sizeof(event)); // TODO: Check with valgrind if this is necessary
+				memset(&event, 0, sizeof(event));
 				event.events = EPOLLIN;
 				event.data.fd = clientfd;
 				if (epoll_ctl(epollfd, EPOLL_CTL_ADD, clientfd, &event) == -1)
@@ -295,7 +294,7 @@ std::string Server::_handleMethods(const std::string &method, const std::string 
 
 	if (method == "GET")
 		response = Server::_handleGET(requestedFile);
-	// else if (method == "POST")e
+	// else if (method == "POST")
 	// {
 	// 	response = handlePostRequest();
 	// }
