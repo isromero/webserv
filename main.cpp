@@ -16,7 +16,7 @@ int main(int argc, char **argv)
 {
 	(void)argc;
 	(void)argv;
-	Server server;
+	Server server(6969);
 
 #if defined(__linux__)
 	server.runLinux();

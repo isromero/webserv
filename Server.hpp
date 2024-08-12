@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/12 13:16:33 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/12 14:17:04 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/12 14:37:40 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -38,10 +38,13 @@
 class Server
 {
 private:
-	int _createSocket();
-	void _bindSocket(int serverfd);
-	void _listenSocket(int serverfd);
-	int _acceptClient(int serverfd);
+	int _port;
+	int _serverfd;
+
+	void _createSocket();
+	void _bindSocket();
+	void _listenSocket();
+	int _acceptClient();
 	std::string _processRequest(int clientfd);
 	std::string _processResponse(const std::string &request);
 	std::string _handleMethods(const std::string &method, const std::string &requestedFile);
@@ -52,6 +55,7 @@ private:
 
 public:
 	Server();
+	Server(int port);
 	Server(const std::string &configFile);
 	Server(const Server &other);
 	Server &operator=(const Server &other);

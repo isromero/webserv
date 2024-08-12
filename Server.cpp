@@ -6,32 +6,43 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/12 13:18:46 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/12 14:27:22 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/12 14:39:09 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Server.hpp"
 
-Server::Server()
+Server::Server() : _port(6969), _serverfd(-1)
 {
+	this->_createSocket();
+	this->_bindSocket();
+	this->_listenSocket();
 }
 
-Server::Server(const std::string &configFile)
+Server::Server(int port) : _port(port), _serverfd(-1)
+{
+	this->_createSocket();
+	this->_bindSocket();
+	this->_listenSocket();
+}
+
+Server::Server(const std::string &configFile) : _port(6969), _serverfd(-1)
 {
 	// TODO: Do it properly
 	(void)configFile;
 }
 
-Server::Server(const Server &other)
+Server::Server(const Server &other) : _port(other._port), _serverfd(other._serverfd)
 {
-	// TODO: Do it properly
-	*this = other;
 }
 
 Server &Server::operator=(const Server &other)
 {
-	// TODO: Do it properly
-	(void)other;
+	if (this != &other)
+	{
+		this->_port = other._port;
+		this->_serverfd = other._serverfd;
+	}
 	return *this;
 }
 
@@ -42,27 +53,23 @@ Server::~Server()
 #if defined(__linux__)
 void Server::runLinux()
 {
-	int serverfd = Server::_createSocket();
-	Server::_bindSocket(serverfd);
-	Server::_listenSocket(serverfd);
-
 	// Create the epoll instance
 	int epollfd = epoll_create1(0);
 	if (epollfd == -1)
 	{
 		std::cerr << "Error: creating the epoll instance: " << strerror(errno) << std::endl;
-		close(serverfd);
+		close(this->_serverfd);
 		exit(EXIT_FAILURE);
 	}
 
 	struct epoll_event event, events[MAX_EVENTS];
 	memset(&event, 0, sizeof(event)); // TODO: Check with valgrind if this is necessary
 	event.events = EPOLLIN;
-	event.data.fd = serverfd;
-	if (epoll_ctl(epollfd, EPOLL_CTL_ADD, serverfd, &event) == -1)
+	event.data.fd = this->_serverfd;
+	if (epoll_ctl(epollfd, EPOLL_CTL_ADD, this->_serverfd, &event) == -1)
 	{
 		std::cerr << "Error: adding the server socket to the epoll instance: " << strerror(errno) << std::endl;
-		close(serverfd);
+		close(this->_serverfd);
 		close(epollfd);
 		exit(EXIT_FAILURE);
 	}
@@ -76,16 +83,16 @@ void Server::runLinux()
 		if (nevents == -1)
 		{
 			std::cerr << "Error: waiting for events: " << strerror(errno) << std::endl;
-			close(serverfd);
+			close(this->_serverfd);
 			close(epollfd);
 			exit(EXIT_FAILURE);
 		}
 
 		for (int i = 0; i < nevents; i++)
 		{
-			if (events[i].data.fd == serverfd)
+			if (events[i].data.fd == this->_serverfd)
 			{
-				int clientfd = Server::_acceptClient(serverfd);
+				int clientfd = this->_acceptClient();
 
 				// Add the client socket to the epoll instance
 				memset(&event, 0, sizeof(event)); // TODO: Check with valgrind if this is necessary
@@ -101,39 +108,34 @@ void Server::runLinux()
 			else
 			{
 				int clientfd = events[i].data.fd;
-				std::string request = Server::_processRequest(clientfd);
-				std::string response = Server::_processResponse(request);
-				Server::_sendResponse(clientfd, response);
+				std::string request = this->_processRequest(clientfd);
+				std::string response = this->_processResponse(request);
+				this->_sendResponse(clientfd, response);
 				close(clientfd);
 			}
 		}
 	}
-	close(serverfd);
+	close(this->_serverfd);
 	close(epollfd);
 }
 #elif defined(__APPLE__)
 void Server::runMac()
 {
-
-	int serverfd = Server::_createSocket();
-	Server::_bindSocket(serverfd);
-	Server::_listenSocket(serverfd);
-
 	// Create the kqueue instance
 	int kqueuefd = kqueue();
 	if (kqueuefd == -1)
 	{
 		std::cerr << "Error: creating the kqueue instance: " << strerror(errno) << std::endl;
-		close(serverfd);
+		close(this->_serverfd);
 		exit(EXIT_FAILURE);
 	}
 
 	struct kevent event, events[MAX_EVENTS];
-	EV_SET(&event, serverfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
+	EV_SET(&event, this->_serverfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
 	if (kevent(kqueuefd, &event, 1, NULL, 0, NULL) == -1)
 	{
 		std::cerr << "Error: adding the server socket to the kqueue instance: " << strerror(errno) << std::endl;
-		close(serverfd);
+		close(this->_serverfd);
 		close(kqueuefd);
 		exit(EXIT_FAILURE);
 	}
@@ -147,16 +149,16 @@ void Server::runMac()
 		if (nevents == -1)
 		{
 			std::cerr << "Error: waiting for events: " << strerror(errno) << std::endl;
-			close(serverfd);
+			close(this->_serverfd);
 			close(kqueuefd);
 			exit(EXIT_FAILURE);
 		}
 
 		for (int i = 0; i < nevents; i++)
 		{
-			if (static_cast<int>(events[i].ident) == serverfd)
+			if (static_cast<int>(events[i].ident) == this->_serverfd)
 			{
-				int clientfd = Server::_acceptClient(serverfd);
+				int clientfd = this->_acceptClient();
 
 				// Add the client socket to the kqueue instance
 				EV_SET(&event, clientfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
@@ -170,66 +172,65 @@ void Server::runMac()
 			else
 			{
 				int clientfd = events[i].ident;
-				std::string request = Server::_processRequest(clientfd);
-				std::string response = Server::_processResponse(request);
-				Server::_sendResponse(clientfd, response);
+				std::string request = this->_processRequest(clientfd);
+				std::string response = this->_processResponse(request);
+				this->_sendResponse(clientfd, response);
 				close(clientfd);
 			}
 		}
 	}
-	close(serverfd);
+	close(this->_serverfd);
 	close(kqueuefd);
 }
 #endif
 
-int Server::_createSocket()
+void Server::_createSocket()
 {
 	// AF_INET: ipv4
 	// SOCK_STREAM: TCP
 	// 0: Default (0 = TCP)
-	int serverfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (serverfd < 0)
+	this->_serverfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (this->_serverfd < 0)
 	{
 		std::cerr << "Error: creating the socket: " << strerror(errno) << std::endl;
 		exit(EXIT_FAILURE);
 	}
-	return serverfd;
 }
 
-void Server::_bindSocket(int serverfd)
+void Server::_bindSocket()
 {
 	// Create the server address
 	struct sockaddr_in serverAddress;
 	serverAddress.sin_family = AF_INET;
-	serverAddress.sin_addr.s_addr = INADDR_ANY; // TODO: Think if we want to do the server with Ipv4 and Ipv6 (we need to use addrinfo, gai_strerror...)
-	serverAddress.sin_port = htons(6969);		// htons converts the port number to network byte order
+	serverAddress.sin_addr.s_addr = INADDR_ANY;	 // TODO: Think if we want to do the server with Ipv4 and Ipv6 (we need to use addrinfo, gai_strerror...)
+	serverAddress.sin_port = htons(this->_port); // htons converts the port number to network byte order
 
 	// Bind the socket to the address and port
-	if (bind(serverfd, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) == -1)
+	if (bind(this->_serverfd, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) == -1)
 	{
 		std::cerr << "Error: binding the socket to the address and port: " << strerror(errno) << std::endl;
-		close(serverfd);
+		close(this->_serverfd);
 		exit(EXIT_FAILURE);
 	}
 }
 
-void Server::_listenSocket(int serverfd)
+void Server::_listenSocket()
 {
 	// Listen for incoming connections
-	if (listen(serverfd, MAX_CLIENTS) == -1)
+	if (listen(this->_serverfd, MAX_CLIENTS) == -1)
 	{
 		std::cerr << "Error: listening for incoming connections: " << strerror(errno) << std::endl;
-		close(serverfd);
+		close(this->_serverfd);
 		exit(EXIT_FAILURE);
 	}
 }
 
-int Server::_acceptClient(int serverfd)
+int Server::_acceptClient()
 {
 	// Accept the incoming connection
 	struct sockaddr_in clientAddress;
 	socklen_t clientAddressSize = sizeof(clientAddress);
-	int clientfd = accept(serverfd, (struct sockaddr *)&clientAddress, &clientAddressSize);
+	int clientfd = accept(this->_serverfd, (struct sockaddr *)&clientAddress, &clientAddressSize);
 	if (clientfd == -1)
 	{
 		std::cerr << "Error: accepting the incoming connection: " << strerror(errno) << std::endl;
