@@ -19,7 +19,7 @@ RM = rm -f
 
 OBJSDIR = objs
 
-SRCS = main.cpp
+SRCS = main.cpp Server.cpp
 OBJS = $(SRCS:%.cpp=${OBJSDIR}/%.o)
 
 # Colors
