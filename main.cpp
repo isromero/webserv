@@ -18,10 +18,15 @@
 #include <fstream>
 #include <sstream>
 #include <cerrno>
-#include <sys/epoll.h>
 #include <cstring>
 #include <fcntl.h>
 #include <sstream>
+
+#if defined(__linux__)
+#include <sys/epoll.h>
+#elif defined(__APPLE__)
+#include <sys/event.h>
+#endif
 
 #define MAX_CLIENTS 10000
 #define MAX_EVENTS 10000
@@ -90,7 +95,7 @@ std::string handleGetRequest(const std::string &requestedFile)
 	ss << fileContent.size();
 	std::string contentType = determineContentType(file);
 	response = "HTTP/1.1 " + status + "\r\n" +
-			    "Content-Type: " +
+			   "Content-Type: " +
 			   contentType + "\r\n" +
 			   "Content-Length: " +
 			   ss.str() + "\r\n\r\n" + fileContent;
@@ -168,16 +173,16 @@ int main()
 		return (1);
 	}
 
-	// Create the epoll instance
+// Create the epoll instance
+#if defined(__linux__)
 	int epollfd = epoll_create1(0);
 	if (epollfd == -1)
 	{
 		std::cerr << "Error: creating the epoll instance: " << strerror(errno) << std::endl;
 		close(serverfd);
-		return (1);
+		return 1;
 	}
 
-	// Add the server socket to the epoll instance
 	struct epoll_event event, events[MAX_EVENTS];
 	memset(&event, 0, sizeof(event));
 	event.events = EPOLLIN;
@@ -187,24 +192,55 @@ int main()
 		std::cerr << "Error: adding the server socket to the epoll instance: " << strerror(errno) << std::endl;
 		close(serverfd);
 		close(epollfd);
-		return (1);
+		return 1;
 	}
+#elif defined(__APPLE__)
+	int kqueuefd = kqueue();
+	if (kqueuefd == -1)
+	{
+		std::cerr << "Error: creating the kqueue instance: " << strerror(errno) << std::endl;
+		close(serverfd);
+		return 1;
+	}
+
+	struct kevent event, events[MAX_EVENTS];
+	EV_SET(&event, serverfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
+	if (kevent(kqueuefd, &event, 1, NULL, 0, NULL) == -1)
+	{
+		std::cerr << "Error: adding the server socket to the kqueue instance: " << strerror(errno) << std::endl;
+		close(serverfd);
+		close(kqueuefd);
+		return 1;
+	}
+#endif
 
 	std::cout << "Server is running on port 6969" << std::endl;
 
 	while (1)
 	{
-		// Wait for events
-		int numEvents = epoll_wait(epollfd, events, MAX_EVENTS, 0); // 0 means that epoll_wait will return immediately (non-blocking, mandatory in the subject)
+#if defined(__linux__)
+		int numEvents = epoll_wait(epollfd, events, MAX_EVENTS, 0); // 0 means that epoll_wait will return immediately(Non-blocking)
 		if (numEvents == -1)
 		{
 			std::cerr << "Error: waiting for events: " << strerror(errno) << std::endl;
 			break;
 		}
+#elif defined(__APPLE__)
+		int numEvents = kevent(kqueuefd, NULL, 0, events, MAX_EVENTS, NULL);
+		if (numEvents == -1)
+		{
+			std::cerr << "Error: waiting for events: " << strerror(errno) << std::endl;
+			break;
+		}
+#endif
 
 		for (int i = 0; i < numEvents; ++i)
 		{
+#if defined(__linux__)
 			if (events[i].data.fd == serverfd)
+#elif defined(__APPLE__)
+			if (static_cast<int>(events[i].ident) == serverfd)
+#endif
 			{
 				// Accept the incoming connection
 				struct sockaddr_in clientAddress;
@@ -216,8 +252,9 @@ int main()
 					continue;
 				}
 
+#ifdef __linux__
 				// Add the client socket to the epoll instance
-				memset(&event, 0, sizeof(event));
+				memset(&event, 0, sizeof(event)); // TODO: Check valgrind
 				event.events = EPOLLIN;
 				event.data.fd = clientfd;
 				if (epoll_ctl(epollfd, EPOLL_CTL_ADD, clientfd, &event) == -1)
@@ -226,12 +263,27 @@ int main()
 					close(clientfd);
 					continue;
 				}
+#elif defined(__APPLE__)
+				// Add the client socket to the kqueue instance
+				EV_SET(&event, clientfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
+				if (kevent(kqueuefd, &event, 1, NULL, 0, NULL) == -1)
+				{
+					std::cerr << "Error: adding the client socket to the kqueue instance: " << strerror(errno) << std::endl;
+					close(clientfd);
+					continue;
+				}
+#endif
 
 				std::cout << "Accepted connection" << std::endl;
 			}
 			else
 			{
-				int clientfd = events[i].data.fd;
+				int clientfd;
+#if defined(__linux__)
+				clientfd = events[i].data.fd;
+#elif defined(__APPLE__)
+				clientfd = events[i].ident;
+#endif
 				char buffer[1024];
 				ssize_t bytesRead;
 				std::string request;
@@ -274,6 +326,10 @@ int main()
 		}
 	}
 	close(serverfd);
+#if defined(__linux__)
 	close(epollfd);
+#elif defined(__APPLE__)
+	close(kqueuefd);
+#endif
 	return (0);
 }
