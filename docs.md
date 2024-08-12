@@ -14,6 +14,12 @@
 
 [crear un server con epoll en c](https://unscriptedcoding.medium.com/multithreaded-server-in-c-using-epoll-baadad32224c)
 
+[all status codes](https://developer.mozilla.org/es/docs/Web/HTTP/Status)
+
+[rfc 9912, http1.1 exactly implementation](https://datatracker.ietf.org/doc/html/rfc9112#name-message-format)
+
+[rfc 9910, http semantics](https://datatracker.ietf.org/doc/html/rfc9110)
+
 ## Relación entre IPC y Sockets
 
 - Sockets como IPC: Los sockets son una de las muchas formas en las que los procesos pueden comunicarse entre sí, por lo que se consideran una herramienta de IPC. Son especialmente útiles cuando los procesos no están en la misma máquina o cuando se necesita comunicación a través de una red.

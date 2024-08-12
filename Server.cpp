@@ -74,7 +74,8 @@ void Server::runLinux()
 		exit(EXIT_FAILURE);
 	}
 
-	std::cout << "Server is running on port 6969" << std::endl;
+	std::cout << "Server is running on port 6969..." << std::endl
+			  << std::endl;
 
 	// Main loop
 	while (1)
@@ -107,8 +108,7 @@ void Server::runLinux()
 			else
 			{
 				int clientfd = events[i].data.fd;
-				std::string request = this->_processRequest(clientfd);
-				std::string response = this->_processResponse(request);
+				std::string response = this->_processRequest(clientfd);
 				this->_sendResponse(clientfd, response);
 				close(clientfd);
 			}
@@ -139,7 +139,8 @@ void Server::runMac()
 		exit(EXIT_FAILURE);
 	}
 
-	std::cout << "Server is running on port 6969" << std::endl;
+	std::cout << "Server is running on port 6969..." << std::endl
+			  << std::endl;
 
 	// Main loop
 	while (1)
@@ -171,8 +172,7 @@ void Server::runMac()
 			else
 			{
 				int clientfd = events[i].ident;
-				std::string request = this->_processRequest(clientfd);
-				std::string response = this->_processResponse(request);
+				std::string response = this->_processRequest(clientfd);
 				this->_sendResponse(clientfd, response);
 				close(clientfd);
 			}
@@ -239,14 +239,15 @@ int Server::_acceptClient()
 	return clientfd;
 }
 
-std::string Server::_processRequest(int clientfd)
+std::string Server::_readRequest(int clientfd)
 {
 	// Just read the data from the client
 	char buffer[1024];
 	ssize_t bytesRead;
 	std::string request;
-	while ((bytesRead = recv(clientfd, buffer, sizeof(buffer), 0)) > 0)
+	while ((bytesRead = recv(clientfd, buffer, sizeof(buffer) - 1, 0)) > 0)
 	{
+		buffer[bytesRead] = '\0';
 		request.append(buffer, bytesRead);
 		if (request.find("\r\n\r\n") != std::string::npos)
 			break;
@@ -263,16 +264,11 @@ std::string Server::_processRequest(int clientfd)
 		return "";
 	}
 
-	std::cout << request << std::endl;
-
 	return request;
 }
 
-std::string Server::_processResponse(const std::string &request)
+void Server::_parseRequest(const std::string &request, std::string &method, std::string &requestedFile, std::map<std::string, std::string> &headers, std::string &body)
 {
-	std::string method;
-	std::string requestedFile;
-
 	size_t methodEnd = request.find(" ");
 	if (methodEnd != std::string::npos)
 	{
@@ -283,8 +279,49 @@ std::string Server::_processResponse(const std::string &request)
 			requestedFile = request.substr(fileStart, fileEnd - fileStart);
 	}
 
-	std::string response = Server::_handleMethods(method, requestedFile);
+	size_t headerEnd = request.find("\r\n\r\n");
+	if (headerEnd != std::string::npos)
+	{
+		size_t pos = request.find("\r\n") + 2;
+		while (pos < headerEnd)
+		{
+			size_t nextPos = request.find("\r\n", pos);
+			std::string headerLine = request.substr(pos, nextPos - pos);
+			pos = nextPos + 2;
 
+			size_t separator = headerLine.find(": ");
+			if (separator != std::string::npos)
+			{
+				std::string key = headerLine.substr(0, separator);
+				std::string value = headerLine.substr(separator + 2);
+				headers[key] = value;
+			}
+		}
+
+		// Extract the body
+		body = request.substr(headerEnd + 4);
+	}
+}
+
+std::string Server::_processResponse(const std::string &method, const std::string &requestedFile)
+{
+	std::string response = this->_handleMethods(method, requestedFile);
+	return response;
+}
+
+std::string Server::_processRequest(int clientfd)
+{
+	std::string request = _readRequest(clientfd);
+	std::cout << request << std::endl;
+	if (request.empty())
+		return "HTTP/1.1 400 Bad Request\r\n\r\n"; // TODO: Manage and send a proper response
+
+	std::string method, requestedFile, body;
+	std::map<std::string, std::string> headers;
+	this->_parseRequest(request, method, requestedFile, headers, body);
+
+	std::string response = this->_processResponse(method, requestedFile);
+	std::cout << response << std::endl;
 	return response;
 }
 

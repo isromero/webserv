@@ -25,6 +25,7 @@
 #include <fcntl.h>
 #include <sstream>
 #include <cstdlib>
+#include <map>
 
 #if defined(__linux__)
 #include <sys/epoll.h>
@@ -45,8 +46,10 @@ private:
 	void _bindSocket();
 	void _listenSocket();
 	int _acceptClient();
+	std::string _readRequest(int clientfd);
+	void _parseRequest(const std::string &request, std::string &method, std::string &requestedFile, std::map<std::string, std::string> &headers, std::string &body);
 	std::string _processRequest(int clientfd);
-	std::string _processResponse(const std::string &request);
+	std::string _processResponse(const std::string &method, const std::string &requestedFile);
 	std::string _handleMethods(const std::string &method, const std::string &requestedFile);
 	std::string _readFile(const std::string &filename);
 	std::string _determineContentType(const std::string &filename);
