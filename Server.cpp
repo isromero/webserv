@@ -281,8 +281,8 @@ std::string Server::_secureFilePath(const std::string &path)
 		securePath.erase(pos, 2);
 	while ((pos = securePath.find("/../")) != std::string::npos)
 		securePath.erase(pos, 3);
-	while (!securePath.empty() && securePath.back() == '/')
-		securePath.pop_back();
+	while (!securePath.empty() && securePath[securePath.size() - 1] == '/')
+		securePath.erase(securePath.size() - 1);
 	if (securePath.empty())
 		securePath = "/index.html";
 	return securePath;
@@ -440,8 +440,10 @@ ParseRequestError Server::_parseRequest(const std::string &request, std::string 
 	// Check for Host header value
 	std::map<std::string, std::string>::iterator hostIt = headers.find("Host");
 	std::string hostValue = hostIt->second;
-	std::string hostWithPort = (std::ostringstream() << "localhost:" << this->_port).str(); // TODO: Change host when we have the config file
-	if (hostValue.empty() || (hostValue != hostWithPort && hostValue != "localhost"))		// TODO: Change hosts when we have the config file
+	std::ostringstream oss;
+	oss << "localhost:" << this->_port; // TODO: Change host when we have the config file
+	std::string hostWithPort = oss.str();
+	if (hostValue.empty() || (hostValue != hostWithPort && hostValue != "localhost")) // TODO: Change hosts when we have the config file
 		return INVALID_HEADER_FORMAT;
 
 	// Check for Content-Length
