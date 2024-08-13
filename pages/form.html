@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test POST Requests</title>
+</head>
+<body>
+    <h1>Test POST Requests</h1>
+
+    <!-- Formulario para /submit -->
+    <h2>Submit Form</h2>
+    <form action="http://localhost:6969" method="POST">
+        <input type="hidden" name="action" value="submit">
+        <label for="username_submit">Username:</label>
+        <input type="text" id="username_submit" name="username">
+        <br>
+        <label for="password_submit">Password:</label>
+        <input type="password" id="password_submit" name="password">
+        <br>
+        <input type="submit" value="Submit">
+    </form>
+
+    <hr>
+
+    <!-- Formulario para /login -->
+    <h2>Login Form</h2>
+    <form action="http://localhost:6969" method="POST">
+        <input type="hidden" name="action" value="login">
+        <label for="username_login">Username:</label>
+        <input type="text" id="username_login" name="username">
+        <br>
+        <label for="password_login">Password:</label>
+        <input type="password" id="password_login" name="password">
+        <br>
+        <input type="submit" value="Login">
+    </form>
+
+    <hr>
+
+    <!-- Formulario para /update -->
+    <h2>Update Data Form</h2>
+    <form action="http://localhost:6969" method="POST">
+        <input type="hidden" name="action" value="update">
+        <label for="data_update">Data:</label>
+        <input type="text" id="data_update" name="data">
+        <br>
+        <input type="submit" value="Update Data">
+    </form>
+</body>
+</html>

@@ -64,11 +64,12 @@ private:
 	std::string _secureFilePath(const std::string &path);
 	ParseRequestError _parseRequest(const std::string &request, std::string &method, std::string &requestedFile, std::map<std::string, std::string> &headers, std::string &body);
 	std::string _processRequest(int clientfd);
-	std::string _processResponse(const std::string &method, const std::string &requestedFile);
-	std::string _handleMethods(const std::string &method, const std::string &requestedFile);
+	std::string _processResponse(const std::string &method, const std::string &requestedFile, const std::string &request);
+	std::string _handleMethods(const std::string &method, const std::string &requestedFile, const std::string &request);
 	std::string _readFile(const std::string &filename);
 	std::string _determineContentType(const std::string &filename);
 	std::string _handleGET(const std::string &requestedFile);
+	std::string _handlePOST(const std::string &request);
 	void _sendResponse(int clientfd, const std::string &response);
 
 public:
