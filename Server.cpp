@@ -267,40 +267,190 @@ std::string Server::_readRequest(int clientfd)
 	return request;
 }
 
-void Server::_parseRequest(const std::string &request, std::string &method, std::string &requestedFile, std::map<std::string, std::string> &headers, std::string &body)
+std::string Server::_secureFilePath(const std::string &path)
 {
-	size_t methodEnd = request.find(" ");
-	if (methodEnd != std::string::npos)
+	std::string securePath = path;
+	size_t pos = 0;
+	while ((pos = securePath.find("..")) != std::string::npos)
+		securePath.erase(pos, 2);
+	while ((pos = securePath.find("//")) != std::string::npos)
+		securePath.erase(pos, 1);
+	while ((pos = securePath.find("~")) != std::string::npos)
+		securePath.erase(pos, 1);
+	while ((pos = securePath.find("/./")) != std::string::npos)
+		securePath.erase(pos, 2);
+	while ((pos = securePath.find("/../")) != std::string::npos)
+		securePath.erase(pos, 3);
+	while (!securePath.empty() && securePath.back() == '/')
+		securePath.pop_back();
+
+	if (securePath.empty())
+		securePath = "/index.html";
+
+	return securePath;
+}
+
+// Parsing Request following RFC 9112
+ParseRequestError Server::_parseRequest(const std::string &request, std::string &method, std::string &requestedFile, std::map<std::string, std::string> &headers, std::string &body)
+{
+	if (request.empty())
+		return INVALID_REQUEST;
+	else if (request.size() > 8192) // ! Maximum request size:  we can change this value
+		return PAYLOAD_TOO_LARGE;
+
+	size_t pos = 0;
+	size_t end = 0;
+
+	// Leading empty lines prior to the start-line
+	while (pos < request.size() && (request[pos] == '\r' || request[pos] == '\n'))
 	{
-		method = request.substr(0, methodEnd);
-		size_t fileStart = request.find("/", methodEnd);
-		size_t fileEnd = request.find(" ", fileStart + 1);
-		if (fileStart != std::string::npos && fileEnd != std::string::npos)
-			requestedFile = request.substr(fileStart, fileEnd - fileStart);
+		if (request[pos] == '\r' && pos + 1 < request.size() && request[pos + 1] == '\n')
+			pos += 2;
+		else
+			pos++;
 	}
 
-	size_t headerEnd = request.find("\r\n\r\n");
-	if (headerEnd != std::string::npos)
+	// Parse the start-line
+	end = request.find("\r\n", pos);
+	if (end == std::string::npos)
 	{
-		size_t pos = request.find("\r\n") + 2;
-		while (pos < headerEnd)
-		{
-			size_t nextPos = request.find("\r\n", pos);
-			std::string headerLine = request.substr(pos, nextPos - pos);
-			pos = nextPos + 2;
+		end = request.find('\n', pos);
+		if (end == std::string::npos)
+			return INVALID_REQUEST;
+	}
 
-			size_t separator = headerLine.find(": ");
-			if (separator != std::string::npos)
+	std::string startLine = request.substr(pos, end - pos);
+	size_t methodEnd = startLine.find(' ');
+	size_t fileStart = startLine.find('/', methodEnd);
+	size_t fileEnd = startLine.find(' ', fileStart + 1);
+	size_t versionStart = startLine.find("HTTP/", fileEnd);
+
+	if (methodEnd != std::string::npos && fileStart != std::string::npos && fileEnd != std::string::npos)
+	{
+		method = startLine.substr(0, methodEnd);
+		if (method != "GET" && method != "POST" && method != "DELETE") // TODO: Change if we add more methods
+			return INVALID_METHOD;
+
+		std::string version = startLine.substr(versionStart);
+		if (version != "HTTP/1.1")
+			return VERSION_NOT_SUPPORTED;
+
+		requestedFile = startLine.substr(fileStart, fileEnd - fileStart);
+		requestedFile = this->_secureFilePath(requestedFile);
+	}
+	else if (startLine.find("HTTP/1.1") == std::string::npos)
+		return VERSION_NOT_SUPPORTED;
+	else
+		return INVALID_START_LINE;
+
+	pos = end + 1;
+	if (request[pos] == '\n')
+		pos++; // Skip the \n character if we encountered \r\n
+
+	// Check for whitespace between start-line and first header field
+	if (pos < request.size() && (request[pos] == ' ' || request[pos] == '\t'))
+	{
+		// Whitespace detected, consume whitespace-preceded lines
+		while (pos < request.size())
+		{
+			end = request.find("\r\n", pos);
+			if (end == std::string::npos)
 			{
-				std::string key = headerLine.substr(0, separator);
-				std::string value = headerLine.substr(separator + 2);
-				headers[key] = value;
+				end = request.find('\n', pos);
+				if (end == std::string::npos)
+					break; // End of request
 			}
+
+			// Check if this line starts with a valid header field
+			if (request[pos] != ' ' && request[pos] != '\t')
+			{
+				size_t colon = request.find(':', pos);
+				if (colon != std::string::npos && colon < end && colon > pos)
+					break; // Valid header field found, stop consuming
+			}
+
+			// Consume this line
+			pos = end + 1;
+			if (request[pos] == '\n')
+				pos++;
+		}
+	}
+
+	// Parse headers
+	while (pos < request.size())
+	{
+		end = request.find("\r\n", pos);
+		if (end == std::string::npos)
+		{
+			end = request.find('\n', pos);
+			if (end == std::string::npos)
+				break; // End of request
 		}
 
-		// Extract the body
-		body = request.substr(headerEnd + 4);
+		if (end == pos || (end == pos + 1 && request[pos] == '\r'))
+		{
+			// Empty line, end of headers
+			pos = end + 1;
+			if (request[pos] == '\n')
+				pos++;
+			break;
+		}
+
+		std::string headerLine = request.substr(pos, end - pos);
+		size_t separator = headerLine.find(": ");
+		if (separator != std::string::npos)
+		{
+			std::string headerName = headerLine.substr(0, separator);
+			std::string headerValue = headerLine.substr(separator + 2);
+
+			// Replace bare CR with SP in header value
+			for (size_t i = 0; i < headerValue.size(); ++i)
+			{
+				if (headerValue[i] == '\r' && (i + 1 == headerValue.size() || headerValue[i + 1] != '\n'))
+					headerValue[i] = ' ';
+			}
+
+			headers[headerName] = headerValue;
+		}
+		else
+			return INVALID_HEADER_FORMAT;
+
+		pos = end + 1;
+		if (request[pos] == '\n')
+			pos++;
 	}
+
+	// Check for Content-Length
+	size_t contentLength = 0;
+	std::map<std::string, std::string>::iterator it = headers.find("Content-Length");
+	if (it != headers.end())
+		contentLength = static_cast<size_t>(std::atoi(it->second.c_str()));
+	else
+	{
+		// No Content-Length specified, check for Transfer-Encoding
+		it = headers.find("Transfer-Encoding");
+		if (it != headers.end() && it->second == "chunked") // Actually, we don't support chunked encoding
+			return INVALID_CONTENT_LENGTH;
+	}
+
+	size_t remainingLength = request.size() - pos;
+	if (contentLength > 0)
+	{
+		if (remainingLength < contentLength)
+			return INCOMPLETE_BODY;
+		body = request.substr(pos, contentLength);
+	}
+	else if (remainingLength > 0)
+		body = request.substr(pos); // No Content-Length specified, consume the remaining data
+
+	// Replace bare CR with SP in body
+	for (size_t i = 0; i < body.size(); ++i)
+	{
+		if (body[i] == '\r' && (i + 1 == body.size() || body[i + 1] != '\n'))
+			body[i] = ' ';
+	}
+
+	return NO_ERROR;
 }
 
 std::string Server::_processResponse(const std::string &method, const std::string &requestedFile)
@@ -313,15 +463,32 @@ std::string Server::_processRequest(int clientfd)
 {
 	std::string request = _readRequest(clientfd);
 	std::cout << request << std::endl;
-	if (request.empty())
-		return "HTTP/1.1 400 Bad Request\r\n\r\n"; // TODO: Manage and send a proper response
 
 	std::string method, requestedFile, body;
 	std::map<std::string, std::string> headers;
-	this->_parseRequest(request, method, requestedFile, headers, body);
+	ParseRequestError error = this->_parseRequest(request, method, requestedFile, headers, body);
+	switch (error)
+	{
+	case INVALID_REQUEST:
+	case INVALID_START_LINE:
+	case INVALID_HEADER_FORMAT:
+	case INCOMPLETE_BODY:
+		return "HTTP/1.1 400 Bad Request\r\n\r\n";
+	case INVALID_METHOD:
+		return "HTTP/1.1 405 Method Not Allowed\r\n\r\n";
+	case INVALID_CONTENT_LENGTH:
+		return "HTTP/1.1 411 Length Required\r\n\r\n";
+	case PAYLOAD_TOO_LARGE:
+		return "HTTP/1.1 413 Payload Too Large\r\n\r\n";
+	case VERSION_NOT_SUPPORTED:
+		return "HTTP/1.1 505 HTTP Version Not Supported\r\n\r\n";
+	case NO_ERROR:
+		break;
+	default:
+		return "HTTP/1.1 500 Internal Server Error\r\n\r\n";
+	}
 
 	std::string response = this->_processResponse(method, requestedFile);
-	std::cout << response << std::endl;
 	return response;
 }
 
@@ -330,22 +497,7 @@ std::string Server::_handleMethods(const std::string &method, const std::string 
 	std::string response;
 
 	if (method == "GET")
-		response = Server::_handleGET(requestedFile);
-	// else if (method == "POST")
-	// {
-	// 	response = handlePostRequest();
-	// }
-	// else if (method == "DELETE")
-	// {
-	// 	response = handleDeleteRequest();
-	// }
-	// else
-	// {
-	// 	response = "HTTP/1.0 405 Method Not Allowed\r\n"
-	// 			   "Content-Type: text/plain\r\n"
-	// 			   "Content-Length: 0\r\n\r\n";
-	// }
-
+		response = this->_handleGET(requestedFile);
 	return response;
 }
 
@@ -389,25 +541,17 @@ std::string Server::_handleGET(const std::string &requestedFile)
 	std::string file;
 	std::string status;
 
-	if (requestedFile == "/")
+	file = "pages" + requestedFile;
+
+	if (file.find(".html") == std::string::npos)
+		file += ".html";
+	if (open(file.c_str(), O_RDONLY) == -1)
 	{
-		file = "pages/index.html";
-		status = "200 OK";
+		status = "404 Not Found";
+		file = "pages/404.html";
 	}
 	else
-	{
-		file = "pages" + requestedFile;
-
-		if (file.find(".html") == std::string::npos)
-			file += ".html";
-		if (open(file.c_str(), O_RDONLY) == -1)
-		{
-			status = "404 Not Found";
-			file = "pages/404.html";
-		}
-		else
-			status = "200 OK";
-	}
+		status = "200 OK";
 	std::string fileContent = Server::_readFile(file);
 	std::ostringstream ss;
 	ss << fileContent.size();

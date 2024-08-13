@@ -36,6 +36,19 @@
 #define MAX_CLIENTS 10000
 #define MAX_EVENTS 10000
 
+enum ParseRequestError
+{
+	NO_ERROR,
+	INVALID_REQUEST,
+	INVALID_START_LINE,
+	INVALID_HEADER_FORMAT,
+	INCOMPLETE_BODY,
+	INVALID_METHOD,
+	INVALID_CONTENT_LENGTH,
+	PAYLOAD_TOO_LARGE,
+	VERSION_NOT_SUPPORTED,
+};
+
 class Server
 {
 private:
@@ -47,7 +60,8 @@ private:
 	void _listenSocket();
 	int _acceptClient();
 	std::string _readRequest(int clientfd);
-	void _parseRequest(const std::string &request, std::string &method, std::string &requestedFile, std::map<std::string, std::string> &headers, std::string &body);
+	std::string _secureFilePath(const std::string &path);
+	ParseRequestError _parseRequest(const std::string &request, std::string &method, std::string &requestedFile, std::map<std::string, std::string> &headers, std::string &body);
 	std::string _processRequest(int clientfd);
 	std::string _processResponse(const std::string &method, const std::string &requestedFile);
 	std::string _handleMethods(const std::string &method, const std::string &requestedFile);
