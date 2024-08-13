@@ -283,10 +283,8 @@ std::string Server::_secureFilePath(const std::string &path)
 		securePath.erase(pos, 3);
 	while (!securePath.empty() && securePath.back() == '/')
 		securePath.pop_back();
-
 	if (securePath.empty())
 		securePath = "/index.html";
-
 	return securePath;
 }
 
@@ -301,7 +299,7 @@ ParseRequestError Server::_parseRequest(const std::string &request, std::string 
 	size_t pos = 0;
 	size_t end = 0;
 
-	// Leading empty lines prior to the start-line
+	// Leading empty lines prior to the request-line
 	while (pos < request.size() && (request[pos] == '\r' || request[pos] == '\n'))
 	{
 		if (request[pos] == '\r' && pos + 1 < request.size() && request[pos + 1] == '\n')
@@ -310,7 +308,7 @@ ParseRequestError Server::_parseRequest(const std::string &request, std::string 
 			pos++;
 	}
 
-	// Parse the start-line
+	// Parse the request-line
 	end = request.find("\r\n", pos);
 	if (end == std::string::npos)
 	{
@@ -319,35 +317,48 @@ ParseRequestError Server::_parseRequest(const std::string &request, std::string 
 			return INVALID_REQUEST;
 	}
 
-	std::string startLine = request.substr(pos, end - pos);
-	size_t methodEnd = startLine.find(' ');
-	size_t fileStart = startLine.find('/', methodEnd);
-	size_t fileEnd = startLine.find(' ', fileStart + 1);
-	size_t versionStart = startLine.find("HTTP/", fileEnd);
+	std::string requestLine = request.substr(pos, end - pos);
+	size_t methodEnd = requestLine.find(' ');
+	size_t fileStart = requestLine.find('/', methodEnd);
+	size_t fileEnd = requestLine.find(' ', fileStart + 1);
+	size_t versionStart = requestLine.find("HTTP/", fileEnd);
 
 	if (methodEnd != std::string::npos && fileStart != std::string::npos && fileEnd != std::string::npos)
 	{
-		method = startLine.substr(0, methodEnd);
+		method = requestLine.substr(0, methodEnd);
 		if (method != "GET" && method != "POST" && method != "DELETE") // TODO: Change if we add more methods
 			return INVALID_METHOD;
 
-		std::string version = startLine.substr(versionStart);
+		std::string version = requestLine.substr(versionStart);
 		if (version != "HTTP/1.1")
 			return VERSION_NOT_SUPPORTED;
 
-		requestedFile = startLine.substr(fileStart, fileEnd - fileStart);
+		std::string uri = requestLine.substr(fileStart, fileEnd - fileStart);
+		if (uri.find("://") != std::string::npos)
+		{
+			// Absolute-form request, extract path after the authority. Eg: GET http://localhost:6969/index.html HTTP/1.1
+			size_t pathStart = uri.find('/', uri.find("://") + 3);
+			if (pathStart != std::string::npos)
+				requestedFile = uri.substr(pathStart);
+			else
+				requestedFile = "/";
+		}
+		else
+			requestedFile = uri; // Relative-form request. Eg: GET /index.html HTTP/1.1
+		if (requestedFile.find(' ') != std::string::npos || requestedFile.empty())
+			return INVALID_REQUEST_TARGET;
 		requestedFile = this->_secureFilePath(requestedFile);
 	}
-	else if (startLine.find("HTTP/1.1") == std::string::npos)
+	else if (requestLine.find("HTTP/1.1") == std::string::npos)
 		return VERSION_NOT_SUPPORTED;
 	else
-		return INVALID_START_LINE;
+		return INVALID_REQUEST_LINE;
 
 	pos = end + 1;
 	if (request[pos] == '\n')
 		pos++; // Skip the \n character if we encountered \r\n
 
-	// Check for whitespace between start-line and first header field
+	// Check for whitespace between request-line and first header field
 	if (pos < request.size() && (request[pos] == ' ' || request[pos] == '\t'))
 	{
 		// Whitespace detected, consume whitespace-preceded lines
@@ -420,6 +431,19 @@ ParseRequestError Server::_parseRequest(const std::string &request, std::string 
 			pos++;
 	}
 
+	// Check for Host header is only one(it is necessary just one)
+	size_t hostCount = headers.count("Host");
+	std::cout << "Host count: " << hostCount << std::endl;
+	if (hostCount != 1)
+		return INVALID_HEADER_FORMAT;
+
+	// Check for Host header value
+	std::map<std::string, std::string>::iterator hostIt = headers.find("Host");
+	std::string hostValue = hostIt->second;
+	std::string hostWithPort = (std::ostringstream() << "localhost:" << this->_port).str(); // TODO: Change host when we have the config file
+	if (hostValue.empty() || (hostValue != hostWithPort && hostValue != "localhost"))		// TODO: Change hosts when we have the config file
+		return INVALID_HEADER_FORMAT;
+
 	// Check for Content-Length
 	size_t contentLength = 0;
 	std::map<std::string, std::string>::iterator it = headers.find("Content-Length");
@@ -470,9 +494,10 @@ std::string Server::_processRequest(int clientfd)
 	switch (error)
 	{
 	case INVALID_REQUEST:
-	case INVALID_START_LINE:
+	case INVALID_REQUEST_LINE:
 	case INVALID_HEADER_FORMAT:
 	case INCOMPLETE_BODY:
+	case INVALID_REQUEST_TARGET:
 		return "HTTP/1.1 400 Bad Request\r\n\r\n";
 	case INVALID_METHOD:
 		return "HTTP/1.1 405 Method Not Allowed\r\n\r\n";
