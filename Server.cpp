@@ -476,9 +476,9 @@ ParseRequestError Server::_parseRequest(const std::string &request, std::string 
 	return NO_ERROR;
 }
 
-std::string Server::_processResponse(const std::string &method, const std::string &requestedFile)
+std::string Server::_processResponse(const std::string &method, const std::string &requestedFile, const std::string &request)
 {
-	std::string response = this->_handleMethods(method, requestedFile);
+	std::string response = this->_handleMethods(method, requestedFile, request);
 	return response;
 }
 
@@ -546,16 +546,18 @@ std::string Server::_processRequest(int clientfd)
 	if (error != NO_ERROR)
 		return this->_generateErrorResponse(error);
 
-	std::string response = this->_processResponse(method, requestedFile);
+	std::string response = this->_processResponse(method, requestedFile, request);
 	return response;
 }
 
-std::string Server::_handleMethods(const std::string &method, const std::string &requestedFile)
+std::string Server::_handleMethods(const std::string &method, const std::string &requestedFile, const std::string &request)
 {
 	std::string response;
 
 	if (method == "GET")
 		response = this->_handleGET(requestedFile);
+	else if (method == "POST")
+		response = this->_handlePOST(request);
 	return response;
 }
 
@@ -631,6 +633,112 @@ std::string Server::_determineContentType(const std::string &filename)
 		return "application/vnd.ms-powerpoint";
 	else
 		return "application/octet-stream"; // Default binary file type
+}
+
+std::string Server::_handlePOST(const std::string &request)
+{
+	std::string response;
+	std::string status = "400 Bad Request";
+	std::string responseBody = "400 Bad Request: Malformed POST request.";
+	std::string contentType;
+	std::string body;
+
+	size_t headerEnd = request.find("\r\n\r\n");
+	if (headerEnd != std::string::npos)
+	{
+		body = request.substr(headerEnd + 4);
+
+		size_t contentTypeStart = request.find("Content-Type: ");
+		if (contentTypeStart != std::string::npos)
+		{
+			size_t contentTypeEnd = request.find("\r\n", contentTypeStart);
+			contentType = request.substr(contentTypeStart + 14, contentTypeEnd - contentTypeStart - 14);
+		}
+	}
+
+	if (body.empty())
+	{
+		if (contentType.empty())
+		{
+			status = "400 Bad Request";
+			responseBody = "400 Bad Request: Content-Type header missing.";
+		}
+		else
+		{
+			status = "400 Bad Request";
+			responseBody = "400 Bad Request: The POST request body cannot be empty.";
+		}
+	}
+	else if (contentType == "application/json")
+	{
+		if (body.size() >= 2 && body[0] == '{' && body[body.size() - 1] == '}')
+		{
+			status = "201 Created";
+			responseBody = "201 Created: Data received and processed successfully.";
+		}
+		else
+		{
+			status = "400 Bad Request";
+			responseBody = "400 Bad Request: Malformed JSON body.";
+		}
+	}
+	else if (contentType == "application/x-www-form-urlencoded")
+	{
+		if (body.find('=') != std::string::npos && body.find('&') != std::string::npos)
+		{
+			status = "201 Created";
+			responseBody = "201 Created: Data received and processed successfully.";
+		}
+		else
+		{
+			status = "400 Bad Request";
+			responseBody = "400 Bad Request: Malformed application/x-www-form-urlencoded body.";
+		}
+	}
+	else if (contentType == "multipart/form-data")
+	{
+		size_t boundaryStart = request.find("boundary=");
+		if (boundaryStart != std::string::npos)
+		{
+			std::string boundary = request.substr(boundaryStart + 9);
+			if (body.find(boundary) != std::string::npos)
+			{
+				status = "415 Unsupported Media Type";
+				responseBody = "415 Unsupported Media Type: The server cannot handle this content type.";
+			}
+			else
+			{
+				status = "400 Bad Request";
+				responseBody = "400 Bad Request: Malformed multipart/form-data body.";
+			}
+		}
+		else
+		{
+			status = "400 Bad Request";
+			responseBody = "400 Bad Request: Malformed multipart/form-data. Boundary missing.";
+		}
+	}
+	else if (contentType == "text/plain")
+	{
+		status = "201 Created";
+		responseBody = "201 Created: Data received and processed successfully.";
+	}
+	else
+	{
+		status = "415 Unsupported Media Type";
+		responseBody = "415 Unsupported Media Type: The server cannot handle this content type.";
+	}
+
+	std::ostringstream ss;
+	ss << responseBody.size();
+	response = "HTTP/1.1 " + status + "\r\n" +
+			   "Content-Type: text/plain\r\n" +
+			   "Content-Length: " + ss.str() + "\r\n" +
+			   "Connection: close\r\n" +
+			   "\r\n" +
+			   responseBody;
+
+	return response;
 }
 
 std::string Server::_handleGET(const std::string &requestedFile)
