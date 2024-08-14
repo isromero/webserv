@@ -281,10 +281,6 @@ std::string Server::_secureFilePath(const std::string &path)
 		securePath.erase(pos, 2);
 	while ((pos = securePath.find("/../")) != std::string::npos)
 		securePath.erase(pos, 3);
-	while (!securePath.empty() && securePath[securePath.size() - 1] == '/')
-		securePath.erase(securePath.size() - 1);
-	if (securePath.empty())
-		securePath = "/index.html";
 	return securePath;
 }
 
@@ -334,6 +330,8 @@ ParseRequestError Server::_parseRequest(const std::string &request, std::string 
 			return VERSION_NOT_SUPPORTED;
 
 		std::string uri = requestLine.substr(fileStart, fileEnd - fileStart);
+		if (uri.size() > 2048) // ! Maximum URI size: we can change this value
+			return URI_TOO_LONG;
 		if (uri.find("://") != std::string::npos)
 		{
 			// Absolute-form request, extract path after the authority. Eg: GET http://localhost:6969/index.html HTTP/1.1
@@ -433,7 +431,6 @@ ParseRequestError Server::_parseRequest(const std::string &request, std::string 
 
 	// Check for Host header is only one(it is necessary just one)
 	size_t hostCount = headers.count("Host");
-	std::cout << "Host count: " << hostCount << std::endl;
 	if (hostCount != 1)
 		return INVALID_HEADER_FORMAT;
 
@@ -485,6 +482,59 @@ std::string Server::_processResponse(const std::string &method, const std::strin
 	return response;
 }
 
+std::string Server::_generateErrorResponse(ParseRequestError error)
+{
+	std::string status_line, body;
+
+	switch (error)
+	{
+	case INVALID_REQUEST:
+	case INVALID_REQUEST_LINE:
+	case INVALID_HEADER_FORMAT:
+	case INCOMPLETE_BODY:
+	case INVALID_REQUEST_TARGET:
+		status_line = "HTTP/1.1 400 Bad Request";
+		body = "400 Bad Request: The server cannot process the request due to a client error.";
+		break;
+	case INVALID_METHOD:
+		status_line = "HTTP/1.1 405 Method Not Allowed";
+		body = "405 Method Not Allowed: The method specified in the request is not allowed.";
+		break;
+	case INVALID_CONTENT_LENGTH:
+		status_line = "HTTP/1.1 411 Length Required";
+		body = "411 Length Required: The request did not specify the length of its content.";
+		break;
+	case PAYLOAD_TOO_LARGE:
+		status_line = "HTTP/1.1 413 Payload Too Large";
+		body = "413 Payload Too Large: The request is larger than the server is willing or able to process.";
+		break;
+	case URI_TOO_LONG:
+		status_line = "HTTP/1.1 414 URI Too Long";
+		body = "414 URI Too Long: The URI provided was too long for the server to process.";
+		break;
+	case VERSION_NOT_SUPPORTED:
+		status_line = "HTTP/1.1 505 HTTP Version Not Supported";
+		body = "505 HTTP Version Not Supported: The HTTP version used in the request is not supported by the server.";
+		break;
+	default:
+		status_line = "HTTP/1.1 500 Internal Server Error";
+		body = "500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.";
+		break;
+	}
+
+	std::string response = status_line + "\r\n";
+	response += "Content-Type: text/plain\r\n"; // TODO: Create function to create error pages with html and don't return text/plain???
+
+	std::stringstream ss;
+	ss << body.size();
+	response += "Content-Length: " + ss.str() + "\r\n";
+
+	response += "\r\n";
+	response += body;
+
+	return response;
+}
+
 std::string Server::_processRequest(int clientfd)
 {
 	std::string request = _readRequest(clientfd);
@@ -493,27 +543,8 @@ std::string Server::_processRequest(int clientfd)
 	std::string method, requestedFile, body;
 	std::map<std::string, std::string> headers;
 	ParseRequestError error = this->_parseRequest(request, method, requestedFile, headers, body);
-	switch (error)
-	{
-	case INVALID_REQUEST:
-	case INVALID_REQUEST_LINE:
-	case INVALID_HEADER_FORMAT:
-	case INCOMPLETE_BODY:
-	case INVALID_REQUEST_TARGET:
-		return "HTTP/1.1 400 Bad Request\r\n\r\n";
-	case INVALID_METHOD:
-		return "HTTP/1.1 405 Method Not Allowed\r\n\r\n";
-	case INVALID_CONTENT_LENGTH:
-		return "HTTP/1.1 411 Length Required\r\n\r\n";
-	case PAYLOAD_TOO_LARGE:
-		return "HTTP/1.1 413 Payload Too Large\r\n\r\n";
-	case VERSION_NOT_SUPPORTED:
-		return "HTTP/1.1 505 HTTP Version Not Supported\r\n\r\n";
-	case NO_ERROR:
-		break;
-	default:
-		return "HTTP/1.1 500 Internal Server Error\r\n\r\n";
-	}
+	if (error != NO_ERROR)
+		return this->_generateErrorResponse(error);
 
 	std::string response = this->_processResponse(method, requestedFile, request);
 	return response;
@@ -546,22 +577,62 @@ std::string Server::_readFile(const std::string &filename)
 
 std::string Server::_determineContentType(const std::string &filename)
 {
-	if (filename.find(".html") != std::string::npos)
+	if (filename.find(".html") != std::string::npos || filename.find(".htm") != std::string::npos)
 		return "text/html";
 	else if (filename.find(".css") != std::string::npos)
 		return "text/css";
 	else if (filename.find(".js") != std::string::npos)
 		return "application/javascript";
-	else if (filename.find(".jpg") != std::string::npos)
+	else if (filename.find(".json") != std::string::npos)
+		return "application/json";
+	else if (filename.find(".xml") != std::string::npos)
+		return "application/xml";
+	else if (filename.find(".pdf") != std::string::npos)
+		return "application/pdf";
+	else if (filename.find(".jpg") != std::string::npos || filename.find(".jpeg") != std::string::npos)
 		return "image/jpeg";
 	else if (filename.find(".png") != std::string::npos)
 		return "image/png";
 	else if (filename.find(".gif") != std::string::npos)
 		return "image/gif";
+	else if (filename.find(".svg") != std::string::npos)
+		return "image/svg+xml";
 	else if (filename.find(".ico") != std::string::npos)
 		return "image/x-icon";
-	else
+	else if (filename.find(".tif") != std::string::npos || filename.find(".tiff") != std::string::npos)
+		return "image/tiff";
+	else if (filename.find(".webp") != std::string::npos)
+		return "image/webp";
+	else if (filename.find(".mp3") != std::string::npos)
+		return "audio/mpeg";
+	else if (filename.find(".wav") != std::string::npos)
+		return "audio/wav";
+	else if (filename.find(".mp4") != std::string::npos)
+		return "video/mp4";
+	else if (filename.find(".avi") != std::string::npos)
+		return "video/x-msvideo";
+	else if (filename.find(".mpeg") != std::string::npos || filename.find(".mpg") != std::string::npos)
+		return "video/mpeg";
+	else if (filename.find(".webm") != std::string::npos)
+		return "video/webm";
+	else if (filename.find(".zip") != std::string::npos)
+		return "application/zip";
+	else if (filename.find(".tar") != std::string::npos)
+		return "application/x-tar";
+	else if (filename.find(".gz") != std::string::npos || filename.find(".gzip") != std::string::npos)
+		return "application/gzip";
+	else if (filename.find(".txt") != std::string::npos)
 		return "text/plain";
+	else if (filename.find(".rtf") != std::string::npos)
+		return "application/rtf";
+	else if (filename.find(".doc") != std::string::npos || filename.find(".docx") != std::string::npos)
+		return "application/msword";
+	else if (filename.find(".xls") != std::string::npos || filename.find(".xlsx") != std::string::npos)
+		return "application/vnd.ms-excel";
+	else if (filename.find(".ppt") != std::string::npos || filename.find(".pptx") != std::string::npos)
+		return "application/vnd.ms-powerpoint";
+	else
+		return "application/octet-stream"; // Default binary file type
 }
 
 std::string Server::_handlePOST(const std::string &request)
@@ -672,30 +743,54 @@ std::string Server::_handlePOST(const std::string &request)
 
 std::string Server::_handleGET(const std::string &requestedFile)
 {
+	// TODO: Refactor and check the requested file here?????
+	// TODO: Refactor and create enums, generation of error codes like requests differently...???
 	std::string response;
 	std::string file;
 	std::string status;
 
-	file = "pages" + requestedFile;
+	std::cout << "Requested file: " << requestedFile << std::endl;
+	if (requestedFile[requestedFile.size() - 1] == '/') // If is a directory just serve the index.html or index.htm
+	{
+		if (access(("pages" + requestedFile + "index.html").c_str(), F_OK) == 0)
+			file = "pages" + requestedFile + "index.html";
+		else if (access(("pages" + requestedFile + "index.htm").c_str(), F_OK) == 0)
+			file = "pages" + requestedFile + "index.htm";
+	}
+	else
+		file = "pages" + requestedFile;
 
-	if (file.find(".html") == std::string::npos)
+	// Check if the file has an extension, if not add .html
+	if (file.find_last_of(".") == std::string::npos)
 		file += ".html";
-	if (open(file.c_str(), O_RDONLY) == -1)
+
+	// Check if the file exists
+	if (access(file.c_str(), F_OK) != 0)
 	{
 		status = "404 Not Found";
 		file = "pages/404.html";
 	}
 	else
-		status = "200 OK";
-	std::string fileContent = Server::_readFile(file);
+	{
+		// Check if the file is readable
+		if (access(file.c_str(), R_OK) != 0)
+		{
+			status = "403 Forbidden";
+			file = "pages/403.html";
+		}
+		else
+			status = "200 OK";
+	}
+
+	std::string fileContent = this->_readFile(file);
 	std::ostringstream ss;
 	ss << fileContent.size();
-	std::string contentType = Server::_determineContentType(file);
+	std::string contentType = this->_determineContentType(file);
+	if (status.empty())
+		status = "200 OK";
 	response = "HTTP/1.1 " + status + "\r\n" +
-			   "Content-Type: " +
-			   contentType + "\r\n" +
-			   "Content-Length: " +
-			   ss.str() + "\r\n\r\n" + fileContent;
+			   "Content-Type: " + contentType + "\r\n" +
+			   "Content-Length: " + ss.str() + "\r\n\r\n" + fileContent;
 
 	return response;
 }
@@ -711,3 +806,5 @@ void Server::_sendResponse(int clientfd, const std::string &response)
 	else
 		std::cout << response << std::endl;
 }
+
+// TODO: close all the sockets and the server socket when we finish the server when we CTRL+C???? Check it because port is still in use after CTRL+C during some time
