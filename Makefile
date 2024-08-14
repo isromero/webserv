@@ -14,13 +14,14 @@
 NAME = webserv
 
 CC = c++
-CFLAGS = -Wall -Wextra -Werror -O3 -std=c++98
+CFLAGS = -Wall -Wextra -Werror -O3 -std=c++98 -I include
 RM = rm -f
 
+SRCSDIR = src
 OBJSDIR = objs
 
-SRCS = main.cpp Server.cpp
-OBJS = $(SRCS:%.cpp=${OBJSDIR}/%.o)
+SRCS = main.cpp Server.cpp Socket.cpp Request.cpp Response.cpp utils.cpp
+OBJS = $(addprefix $(OBJSDIR)/, $(SRCS:.cpp=.o))
 
 # Colors
 GREEN = \033[0;32m
@@ -40,7 +41,7 @@ $(NAME): $(OBJS)
 	$(CC) $(CFLAGS) -o $(NAME) $(OBJS)
 	@printf "$(GREEN)✔ $(NAME) has been created.$(NC)\n"
 
-$(OBJSDIR)/%.o: %.cpp | $(OBJSDIR)
+$(OBJSDIR)/%.o: $(SRCSDIR)/%.cpp | $(OBJSDIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(OBJSDIR):

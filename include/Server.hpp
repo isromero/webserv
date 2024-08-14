@@ -15,15 +15,12 @@
 
 #include <iostream>
 #include <string>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <unistd.h>
 #include <fstream>
 #include <sstream>
 #include <cerrno>
 #include <cstring>
 #include <fcntl.h>
-#include <sstream>
 #include <cstdlib>
 #include <map>
 
@@ -33,51 +30,26 @@
 #include <sys/event.h>
 #endif
 
-#define MAX_CLIENTS 10000
 #define MAX_EVENTS 10000
 
-enum ParseRequestError
-{
-	NO_ERROR,
-	INVALID_REQUEST,
-	INVALID_REQUEST_LINE,
-	INVALID_HEADER_FORMAT,
-	INCOMPLETE_BODY,
-	INVALID_REQUEST_TARGET,
-	INVALID_METHOD,
-	INVALID_CONTENT_LENGTH,
-	PAYLOAD_TOO_LARGE,
-	URI_TOO_LONG,
-	VERSION_NOT_SUPPORTED,
-};
+#include "errors.hpp"
+#include "utils.hpp"
+#include "Socket.hpp"
+#include "Request.hpp"
+#include "Response.hpp"
 
 class Server
 {
 private:
-	int _port;
-	int _serverfd;
+	Socket _socket;
 
-	void _createSocket();
-	void _bindSocket();
-	void _listenSocket();
 	int _acceptClient();
-	std::string _readRequest(int clientfd);
-	std::string _secureFilePath(const std::string &path);
-	ParseRequestError _parseRequest(const std::string &request, std::string &method, std::string &requestedFile, std::map<std::string, std::string> &headers, std::string &body);
-	std::string _processRequest(int clientfd);
-	std::string _processResponse(const std::string &method, const std::string &requestedFile, const std::string &request);
-	std::string _handleMethods(const std::string &method, const std::string &requestedFile, const std::string &request);
-	std::string _generateErrorResponse(ParseRequestError error);
-	std::string _readFile(const std::string &filename);
+	std::string _processRequestResponse(int clientfd);
 	std::string _determineContentType(const std::string &filename);
-	std::string _handleGET(const std::string &requestedFile);
-	std::string _handlePOST(const std::string &request);
 	void _sendResponse(int clientfd, const std::string &response);
 
 public:
-	Server();
 	Server(int port);
-	Server(const std::string &configFile);
 	Server(const Server &other);
 	Server &operator=(const Server &other);
 	~Server();
