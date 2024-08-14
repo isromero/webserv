@@ -47,6 +47,7 @@ enum ParseRequestError
 	INVALID_METHOD,
 	INVALID_CONTENT_LENGTH,
 	PAYLOAD_TOO_LARGE,
+	URI_TOO_LONG,
 	VERSION_NOT_SUPPORTED,
 };
 
@@ -65,6 +66,7 @@ private:
 	ParseRequestError _parseRequest(const std::string &request, std::string &method, std::string &requestedFile, std::map<std::string, std::string> &headers, std::string &body);
 	std::string _processRequest(int clientfd);
 	std::string _processResponse(const std::string &method, const std::string &requestedFile);
+	std::string _generateErrorResponse(ParseRequestError error);
 	std::string _handleMethods(const std::string &method, const std::string &requestedFile);
 	std::string _readFile(const std::string &filename);
 	std::string _determineContentType(const std::string &filename);
