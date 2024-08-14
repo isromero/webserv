@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Response.cpp                                       :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
+/*   By: adgutier <adgutier@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/14 17:18:48 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/14 20:12:08 by adgutier         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,17 +27,20 @@ const std::string &Response::handleMethods()
 		this->_handleGET();
 	else if (this->_method == "POST")
 		this->_handlePOST();
+	else if (this->_method == "DELETE")
+		this->_handleDELETE();
 	return this->_response;
 }
-
 void Response::_handlePOST()
 {
-	// TODO: Refactor using variables of the class + fix some things of post
+	std::string response;
 	std::string status = "400 Bad Request";
 	std::string responseBody = "400 Bad Request: Malformed POST request.";
 	std::string contentType;
 	std::string body;
+	std::string locationHeader;
 
+	// Obtener el cuerpo y Content-Type
 	size_t headerEnd = this->_request.find("\r\n\r\n");
 	if (headerEnd != std::string::npos)
 	{
@@ -51,6 +54,7 @@ void Response::_handlePOST()
 		}
 	}
 
+	// Verificar Content-Type y manejar el cuerpo
 	if (body.empty())
 	{
 		if (contentType.empty())
@@ -66,10 +70,13 @@ void Response::_handlePOST()
 	}
 	else if (contentType == "application/json")
 	{
+		// Verificación básica de JSON
 		if (body.size() >= 2 && body[0] == '{' && body[body.size() - 1] == '}')
 		{
+			// Crear un nuevo recurso y devolver su ubicación
 			status = "201 Created";
 			responseBody = "201 Created: Data received and processed successfully.";
+			locationHeader = "/new/resource/identifier"; // Ejemplo de URI del nuevo recurso creado
 		}
 		else
 		{
@@ -78,20 +85,51 @@ void Response::_handlePOST()
 		}
 	}
 	else if (contentType == "application/x-www-form-urlencoded")
-	{
-		if (body.find('=') != std::string::npos && body.find('&') != std::string::npos)
-		{
-			status = "201 Created";
-			responseBody = "201 Created: Data received and processed successfully.";
-		}
-		else
-		{
-			status = "400 Bad Request";
-			responseBody = "400 Bad Request: Malformed application/x-www-form-urlencoded body.";
-		}
-	}
+{
+    bool valid = true;
+    size_t pos = 0;
+
+    // Itera sobre los parámetros separados por '&'
+    while (pos < body.length())
+    {
+        // Encuentra la posición del signo '=' para verificar si existe un valor para la clave
+        size_t eqPos = body.find('=', pos);
+
+        // Si no se encuentra un '=', o está al principio o final, es un cuerpo malformado
+        if (eqPos == std::string::npos || eqPos == pos || eqPos == body.length() - 1)
+        {
+            valid = false;
+            break;
+        }
+
+        // Encuentra el próximo '&' o final de la cadena
+        size_t ampPos = body.find('&', eqPos);
+
+        // Si no hay más '&', termina el ciclo
+        if (ampPos == std::string::npos)
+        {
+            break;
+        }
+        
+        pos = ampPos + 1; // Mueve la posición al siguiente parámetro
+    }
+
+    if (valid)
+    {
+        status = "201 Created";
+        responseBody = "201 Created: Data received and processed successfully.";
+    }
+    else
+    {
+        status = "400 Bad Request";
+        responseBody = "400 Bad Request: Malformed application/x-www-form-urlencoded body.";
+    }
+}
+
+
 	else if (contentType == "multipart/form-data")
 	{
+		// Verificación básica del boundary
 		size_t boundaryStart = this->_request.find("boundary=");
 		if (boundaryStart != std::string::npos)
 		{
@@ -115,8 +153,21 @@ void Response::_handlePOST()
 	}
 	else if (contentType == "text/plain")
 	{
-		status = "201 Created";
-		responseBody = "201 Created: Data received and processed successfully.";
+		if (body == "redirect")
+		{
+			status = "303 See Other";
+			locationHeader = "/existing/resource"; // Redirigir a un recurso existente
+		}
+		else if (body.empty())
+		{
+			status = "204 No Content";
+			responseBody.clear(); // Sin contenido
+		}
+		else
+		{
+			status = "200 OK";
+			responseBody = "200 OK: Data received and processed successfully.";
+		}
 	}
 	else
 	{
@@ -124,13 +175,97 @@ void Response::_handlePOST()
 		responseBody = "415 Unsupported Media Type: The server cannot handle this content type.";
 	}
 
-	this->_response = "HTTP/1.1 " + status + "\r\n" +
-					  "Content-Type: text/plain\r\n" +
-					  "Content-Length: " + toString(responseBody.size()) + "\r\n" +
-					  "Connection: close\r\n" + // TODO: Check if we need to close the connection / put in the headers??
-					  "\r\n" +
-					  responseBody;
+	// Construir la respuesta
+	std::ostringstream ss;
+	if (status == "204 No Content")
+	{
+		// Respuesta sin contenido
+		response = "HTTP/1.1 " + status + "\r\n" +
+				   "Connection: close\r\n" +
+				   "\r\n";
+	}
+	else
+	{
+		ss << responseBody.size();
+		response = "HTTP/1.1 " + status + "\r\n" +
+				   "Content-Type: text/plain\r\n" +
+				   "Content-Length: " + ss.str() + "\r\n" +
+				   (locationHeader.empty() ? "" : "Location: " + locationHeader + "\r\n") +
+				   "Connection: close\r\n" + // TODO: Check if we need to close the connection / put in the headers??
+				   "\r\n" +
+				   responseBody;
+	}
+	this->_response = response;
 }
+
+void Response::_handleDELETE() // TODO: use this to test curl -X DELETE http://localhost:6969/file.html
+{
+    std::string response;
+    std::string status;
+    std::string file;
+    
+    // Determinar el archivo o recurso a eliminar
+    if (this->_requestedFile[this->_requestedFile.size() - 1] == '/') // Si es un directorio, no se elimina
+    {
+        status = "400 Bad Request";
+        response = "400 Bad Request: Directory deletion is not allowed.";
+    }
+    else
+    {
+        file = "pages" + this->_requestedFile;
+
+        // Verificar si el archivo existe
+        if (access(file.c_str(), F_OK) != 0)
+        {
+            status = "404 Not Found";
+            file = "pages/404.html";
+            response = readFile(file);
+        }
+        else
+        {
+            // Intentar eliminar el archivo
+            if (remove(file.c_str()) != 0)
+            {
+                status = "403 Forbidden";
+                file = "pages/403.html";
+                response = readFile(file);
+            }
+            else
+            {
+                // En caso de éxito, enviar 204 No Content o 200 OK según la implementación
+                // Aquí asumimos que si el archivo se elimina correctamente, no hay contenido adicional
+                status = "204 No Content";
+                response.clear(); // Sin contenido
+            }
+        }
+    }
+
+    // Construir la respuesta
+    if (status == "204 No Content")
+    {
+        response = "HTTP/1.1 " + status + "\r\n" +
+                   "Connection: close\r\n" +
+                   "\r\n";
+    }
+    else
+    {
+        // Para códigos de estado de error, la respuesta se obtiene del archivo HTML correspondiente
+        const std::string contentType = "text/html";
+        std::ostringstream ss;
+        ss << response.size();
+        response = "HTTP/1.1 " + status + "\r\n" +
+                   "Content-Type: " + contentType + "\r\n" +
+                   "Content-Length: " + ss.str() + "\r\n" +
+                   "Connection: close\r\n" +
+                   "\r\n" +
+                   response;
+    }
+
+    this->_response = response;
+}
+
+
+
 
 void Response::_handleGET()
 {

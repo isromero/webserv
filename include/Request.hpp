@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Request.hpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
+/*   By: adgutier <adgutier@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:42:12 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/14 16:45:33 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/14 18:08:01 by adgutier         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,6 +19,8 @@
 #include <sstream>
 #include <unistd.h>
 #include <sys/socket.h>
+#include <cstring>
+#include <cstdlib>
 
 #include "errors.hpp"
 #include "utils.hpp"

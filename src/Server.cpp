@@ -93,7 +93,7 @@ void Server::runLinux()
 			else
 			{
 				int clientfd = events[i].data.fd;
-				std::string response = this->_processRequest(clientfd);
+				std::string response = this->_processRequestResponse(clientfd);
 				this->_sendResponse(clientfd, response);
 				close(clientfd);
 			}

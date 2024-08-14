@@ -45,7 +45,6 @@ private:
 
 	int _acceptClient();
 	std::string _processRequestResponse(int clientfd);
-	std::string _determineContentType(const std::string &filename);
 	void _sendResponse(int clientfd, const std::string &response);
 
 public:
