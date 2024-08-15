@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Request.cpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: adgutier <adgutier@student.42madrid.com    +#+  +:+       +#+        */
+/*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:44:05 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/14 18:07:27 by adgutier         ###   ########.fr       */
+/*   Updated: 2024/08/15 10:55:49 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -45,35 +45,35 @@ void Request::_readRequest(int clientfd)
 }
 
 // Parsing Request following RFC 9112
-StatusErrorCode Request::parseRequest()
+StatusCode Request::parseRequest()
 {
 	if (this->_request.empty())
-		return INVALID_REQUEST;
+		return ERROR_400;
 	else if (this->_request.size() > 8192) // ! Maximum request size:  we can change this value
-		return PAYLOAD_TOO_LARGE;
+		return ERROR_400;
 
 	size_t pos = 0;
 	size_t end = 0;
 	size_t contentLength = 0;
 
-	StatusErrorCode error = NO_ERROR;
+	StatusCode statusCode = NO_STATUS_CODE;
 
-	error = this->_parseRequestLine(pos, end);
-	if (error != NO_ERROR)
-		return error;
+	statusCode = this->_parseRequestLine(pos, end);
+	if (statusCode != NO_STATUS_CODE)
+		return statusCode;
 
-	error = this->_parseHeaders(pos, end, contentLength);
-	if (error != NO_ERROR)
-		return error;
+	statusCode = this->_parseHeaders(pos, end, contentLength);
+	if (statusCode != NO_STATUS_CODE)
+		return statusCode;
 
-	error = this->_parseBody(pos, contentLength);
-	if (error != NO_ERROR)
-		return error;
+	statusCode = this->_parseBody(pos, contentLength);
+	if (statusCode != NO_STATUS_CODE)
+		return statusCode;
 
-	return NO_ERROR;
+	return NO_STATUS_CODE;
 }
 
-StatusErrorCode Request::_parseRequestLine(size_t &pos, size_t &end)
+StatusCode Request::_parseRequestLine(size_t &pos, size_t &end)
 {
 	// Leading empty lines prior to the request-line
 	while (pos < this->_request.size() && (this->_request[pos] == '\r' || this->_request[pos] == '\n'))
@@ -90,7 +90,7 @@ StatusErrorCode Request::_parseRequestLine(size_t &pos, size_t &end)
 	{
 		end = this->_request.find('\n', pos);
 		if (end == std::string::npos)
-			return INVALID_REQUEST;
+			return ERROR_400;
 	}
 
 	std::string requestLine = this->_request.substr(pos, end - pos);
@@ -103,15 +103,15 @@ StatusErrorCode Request::_parseRequestLine(size_t &pos, size_t &end)
 	{
 		this->_method = requestLine.substr(0, methodEnd);
 		if (this->_method != "GET" && this->_method != "POST" && this->_method != "DELETE") // TODO: Change if we add more methods
-			return INVALID_METHOD;
+			return ERROR_405;
 
 		std::string version = requestLine.substr(versionStart);
 		if (version != "HTTP/1.1")
-			return VERSION_NOT_SUPPORTED;
+			return ERROR_505;
 
 		std::string uri = requestLine.substr(fileStart, fileEnd - fileStart);
 		if (uri.size() > 2048) // ! Maximum URI size: we can change this value
-			return URI_TOO_LONG;
+			return ERROR_414;
 		if (uri.find("://") != std::string::npos)
 		{
 			// Absolute-form request, extract path after the authority. Eg: GET http://localhost:6969/index.html HTTP/1.1
@@ -124,13 +124,13 @@ StatusErrorCode Request::_parseRequestLine(size_t &pos, size_t &end)
 		else
 			this->_requestedFile = uri; // Relative-form this->_request. Eg: GET /index.html HTTP/1.1
 		if (this->_requestedFile.find(' ') != std::string::npos || this->_requestedFile.empty())
-			return INVALID_REQUEST_TARGET;
+			return ERROR_400;
 		this->_requestedFile = secureFilePath(this->_requestedFile);
 	}
 	else if (requestLine.find("HTTP/1.1") == std::string::npos)
-		return VERSION_NOT_SUPPORTED;
+		return ERROR_505;
 	else
-		return INVALID_REQUEST_LINE;
+		return ERROR_400;
 
 	pos = end + 1;
 	if (this->_request[pos] == '\n')
@@ -165,10 +165,10 @@ StatusErrorCode Request::_parseRequestLine(size_t &pos, size_t &end)
 		}
 	}
 
-	return NO_ERROR;
+	return NO_STATUS_CODE;
 }
 
-StatusErrorCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &contentLength)
+StatusCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &contentLength)
 {
 	// Parse headers
 	while (pos < this->_request.size())
@@ -243,7 +243,7 @@ StatusErrorCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &content
 	return NO_ERROR;
 }
 
-StatusErrorCode Request::_parseBody(size_t &pos, size_t &contentLength)
+StatusCode Request::_parseBody(size_t &pos, size_t &contentLength)
 {
 	size_t remainingLength = this->_request.size() - pos;
 	if (contentLength > 0)

@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Response.cpp                                       :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: adgutier <adgutier@student.42madrid.com    +#+  +:+       +#+        */
+/*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/14 20:12:08 by adgutier         ###   ########.fr       */
+/*   Updated: 2024/08/15 11:19:55 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,18 +21,111 @@ Response::~Response()
 {
 }
 
-const std::string &Response::handleMethods()
+const std::string Response::handleResponse(StatusCode statusCode)
+{
+	std::string statusLine, body;
+
+	switch (statusCode)
+	{
+	case ERROR_400:
+		statusLine = "HTTP/1.1 400 Bad Request";
+		body = "400 Bad Request: The server cannot process the request due to a client error.";
+		break;
+	case ERROR_405:
+		statusLine = "HTTP/1.1 405 Method Not Allowed";
+		body = "405 Method Not Allowed: The method specified in the request is not allowed.";
+		break;
+	case ERROR_411:
+		statusLine = "HTTP/1.1 411 Length Required";
+		body = "411 Length Required: The request did not specify the length of its content.";
+		break;
+	case ERROR_413:
+		statusLine = "HTTP/1.1 413 Payload Too Large";
+		body = "413 Payload Too Large: The request is larger than the server is willing or able to process.";
+		break;
+	case ERROR_414:
+		statusLine = "HTTP/1.1 414 URI Too Long";
+		body = "414 URI Too Long: The URI provided was too long for the server to process.";
+		break;
+	case ERROR_505:
+		statusLine = "HTTP/1.1 505 HTTP Version Not Supported";
+		body = "505 HTTP Version Not Supported: The HTTP version used in the request is not supported by the server.";
+		break;
+	default:
+		statusLine = "HTTP/1.1 500 Internal Server Error";
+		body = "500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.";
+		break;
+	}
+
+	std::string response = statusLine + "\r\n";
+	response += "Content-Type: text/plain\r\n"; // TODO: Create function to create error pages with html and don't return text/plain???
+	response += "Content-Length: " + toString(body.size()) + "\r\n\r\n";
+	response += body;
+
+	return response;
+}
+
+StatusCode Response::handleMethods()
 {
 	if (this->_method == "GET")
-		this->_handleGET();
+		return this->_handleGET();
 	else if (this->_method == "POST")
-		this->_handlePOST();
+		return this->_handlePOST();
 	else if (this->_method == "DELETE")
-		this->_handleDELETE();
-	return this->_response;
+		return this->_handleDELETE();
+	return NO_STATUS_CODE; // Impossible to reach this point
 }
-void Response::_handlePOST()
+
+void Response::_handleGET()
 {
+	// TODO: Refactor and check the requested file here?????
+	std::string file;
+	std::string status;
+
+	if (this->_requestedFile[this->_requestedFile.size() - 1] == '/') // If is a directory just serve the index.html or index.htm
+	{
+		if (access(("pages" + this->_requestedFile + "index.html").c_str(), F_OK) == 0)
+			file = "pages" + this->_requestedFile + "index.html";
+		else if (access(("pages" + this->_requestedFile + "index.htm").c_str(), F_OK) == 0)
+			file = "pages" + this->_requestedFile + "index.htm";
+	}
+	else
+		file = "pages" + this->_requestedFile;
+
+	// Check if the file has an extension, if not add .html
+	if (file.find_last_of(".") == std::string::npos)
+		file += ".html";
+
+	// Check if the file exists
+	if (access(file.c_str(), F_OK) != 0)
+	{
+		status = "404 Not Found";
+		file = "pages/404.html";
+	}
+	else
+	{
+		// Check if the file is readable
+		if (access(file.c_str(), R_OK) != 0)
+		{
+			status = "403 Forbidden";
+			file = "pages/403.html"; // ! TODO: this need to be an error page file variable or something like that
+		}
+		else
+			status = "200 OK";
+	}
+
+	std::string fileContent = readFile(file);
+	const std::string contentType = this->_determineContentType(file);
+	if (status.empty())
+		status = "200 OK";
+	this->_response = "HTTP/1.1 " + status + "\r\n" +
+					  "Content-Type: " + contentType + "\r\n" +
+					  "Content-Length: " + toString(fileContent.size()) + "\r\n\r\n" + fileContent;
+}
+
+StatusCode Response::_handlePOST()
+{
+	// ! TODO: refactor this method to use the variables(body, headers, etc) of the Response class
 	std::string response;
 	std::string status = "400 Bad Request";
 	std::string responseBody = "400 Bad Request: Malformed POST request.";
@@ -58,15 +151,9 @@ void Response::_handlePOST()
 	if (body.empty())
 	{
 		if (contentType.empty())
-		{
-			status = "400 Bad Request";
-			responseBody = "400 Bad Request: Content-Type header missing.";
-		}
+			return ERROR_400;
 		else
-		{
-			status = "400 Bad Request";
-			responseBody = "400 Bad Request: The POST request body cannot be empty.";
-		}
+			return ERROR_400;
 	}
 	else if (contentType == "application/json")
 	{
@@ -76,7 +163,7 @@ void Response::_handlePOST()
 			// Crear un nuevo recurso y devolver su ubicación
 			status = "201 Created";
 			responseBody = "201 Created: Data received and processed successfully.";
-			locationHeader = "/new/resource/identifier"; // Ejemplo de URI del nuevo recurso creado
+			locationHeader = "/new/resource/identifier"; // Ejemplo de URI del nuevo recurso creado // ! TODO: locationHeader will need to be pushed inside of the map headers
 		}
 		else
 		{
@@ -85,47 +172,46 @@ void Response::_handlePOST()
 		}
 	}
 	else if (contentType == "application/x-www-form-urlencoded")
-{
-    bool valid = true;
-    size_t pos = 0;
+	{
+		bool valid = true;
+		size_t pos = 0;
 
-    // Itera sobre los parámetros separados por '&'
-    while (pos < body.length())
-    {
-        // Encuentra la posición del signo '=' para verificar si existe un valor para la clave
-        size_t eqPos = body.find('=', pos);
+		// Itera sobre los parámetros separados por '&'
+		while (pos < body.length())
+		{
+			// Encuentra la posición del signo '=' para verificar si existe un valor para la clave
+			size_t eqPos = body.find('=', pos);
 
-        // Si no se encuentra un '=', o está al principio o final, es un cuerpo malformado
-        if (eqPos == std::string::npos || eqPos == pos || eqPos == body.length() - 1)
-        {
-            valid = false;
-            break;
-        }
+			// Si no se encuentra un '=', o está al principio o final, es un cuerpo malformado
+			if (eqPos == std::string::npos || eqPos == pos || eqPos == body.length() - 1)
+			{
+				valid = false;
+				break;
+			}
 
-        // Encuentra el próximo '&' o final de la cadena
-        size_t ampPos = body.find('&', eqPos);
+			// Encuentra el próximo '&' o final de la cadena
+			size_t ampPos = body.find('&', eqPos);
 
-        // Si no hay más '&', termina el ciclo
-        if (ampPos == std::string::npos)
-        {
-            break;
-        }
-        
-        pos = ampPos + 1; // Mueve la posición al siguiente parámetro
-    }
+			// Si no hay más '&', termina el ciclo
+			if (ampPos == std::string::npos)
+			{
+				break;
+			}
 
-    if (valid)
-    {
-        status = "201 Created";
-        responseBody = "201 Created: Data received and processed successfully.";
-    }
-    else
-    {
-        status = "400 Bad Request";
-        responseBody = "400 Bad Request: Malformed application/x-www-form-urlencoded body.";
-    }
-}
+			pos = ampPos + 1; // Mueve la posición al siguiente parámetro
+		}
 
+		if (valid)
+		{
+			status = "201 Created";
+			responseBody = "201 Created: Data received and processed successfully.";
+		}
+		else
+		{
+			status = "400 Bad Request";
+			responseBody = "400 Bad Request: Malformed application/x-www-form-urlencoded body.";
+		}
+	}
 
 	else if (contentType == "multipart/form-data")
 	{
@@ -200,119 +286,68 @@ void Response::_handlePOST()
 
 void Response::_handleDELETE() // TODO: use this to test curl -X DELETE http://localhost:6969/file.html
 {
-    std::string response;
-    std::string status;
-    std::string file;
-    
-    // Determinar el archivo o recurso a eliminar
-    if (this->_requestedFile[this->_requestedFile.size() - 1] == '/') // Si es un directorio, no se elimina
-    {
-        status = "400 Bad Request";
-        response = "400 Bad Request: Directory deletion is not allowed.";
-    }
-    else
-    {
-        file = "pages" + this->_requestedFile;
-
-        // Verificar si el archivo existe
-        if (access(file.c_str(), F_OK) != 0)
-        {
-            status = "404 Not Found";
-            file = "pages/404.html";
-            response = readFile(file);
-        }
-        else
-        {
-            // Intentar eliminar el archivo
-            if (remove(file.c_str()) != 0)
-            {
-                status = "403 Forbidden";
-                file = "pages/403.html";
-                response = readFile(file);
-            }
-            else
-            {
-                // En caso de éxito, enviar 204 No Content o 200 OK según la implementación
-                // Aquí asumimos que si el archivo se elimina correctamente, no hay contenido adicional
-                status = "204 No Content";
-                response.clear(); // Sin contenido
-            }
-        }
-    }
-
-    // Construir la respuesta
-    if (status == "204 No Content")
-    {
-        response = "HTTP/1.1 " + status + "\r\n" +
-                   "Connection: close\r\n" +
-                   "\r\n";
-    }
-    else
-    {
-        // Para códigos de estado de error, la respuesta se obtiene del archivo HTML correspondiente
-        const std::string contentType = "text/html";
-        std::ostringstream ss;
-        ss << response.size();
-        response = "HTTP/1.1 " + status + "\r\n" +
-                   "Content-Type: " + contentType + "\r\n" +
-                   "Content-Length: " + ss.str() + "\r\n" +
-                   "Connection: close\r\n" +
-                   "\r\n" +
-                   response;
-    }
-
-    this->_response = response;
-}
-
-
-
-
-void Response::_handleGET()
-{
-	// TODO: Refactor and check the requested file here?????
-	// TODO: Refactor and create enums, generation of error codes like requests differently...???
-	std::string file;
+	std::string response;
 	std::string status;
+	std::string file;
 
-	if (this->_requestedFile[this->_requestedFile.size() - 1] == '/') // If is a directory just serve the index.html or index.htm
+	// Determinar el archivo o recurso a eliminar
+	if (this->_requestedFile[this->_requestedFile.size() - 1] == '/') // Si es un directorio, no se elimina
 	{
-		if (access(("pages" + this->_requestedFile + "index.html").c_str(), F_OK) == 0)
-			file = "pages" + this->_requestedFile + "index.html";
-		else if (access(("pages" + this->_requestedFile + "index.htm").c_str(), F_OK) == 0)
-			file = "pages" + this->_requestedFile + "index.htm";
+		status = "400 Bad Request";
+		response = "400 Bad Request: Directory deletion is not allowed.";
 	}
 	else
+	{
 		file = "pages" + this->_requestedFile;
 
-	// Check if the file has an extension, if not add .html
-	if (file.find_last_of(".") == std::string::npos)
-		file += ".html";
+		// Verificar si el archivo existe
+		if (access(file.c_str(), F_OK) != 0)
+		{
+			status = "404 Not Found";
+			file = "pages/404.html";
+			response = readFile(file);
+		}
+		else
+		{
+			// Intentar eliminar el archivo
+			if (remove(file.c_str()) != 0)
+			{
+				status = "403 Forbidden";
+				file = "pages/403.html";
+				response = readFile(file);
+			}
+			else
+			{
+				// En caso de éxito, enviar 204 No Content o 200 OK según la implementación
+				// Aquí asumimos que si el archivo se elimina correctamente, no hay contenido adicional
+				status = "204 No Content";
+				response.clear(); // Sin contenido
+			}
+		}
+	}
 
-	// Check if the file exists
-	if (access(file.c_str(), F_OK) != 0)
+	// Construir la respuesta
+	if (status == "204 No Content")
 	{
-		status = "404 Not Found";
-		file = "pages/404.html";
+		response = "HTTP/1.1 " + status + "\r\n" +
+				   "Connection: close\r\n" +
+				   "\r\n";
 	}
 	else
 	{
-		// Check if the file is readable
-		if (access(file.c_str(), R_OK) != 0)
-		{
-			status = "403 Forbidden";
-			file = "pages/403.html";
-		}
-		else
-			status = "200 OK";
+		// Para códigos de estado de error, la respuesta se obtiene del archivo HTML correspondiente
+		const std::string contentType = "text/html";
+		std::ostringstream ss;
+		ss << response.size();
+		response = "HTTP/1.1 " + status + "\r\n" +
+				   "Content-Type: " + contentType + "\r\n" +
+				   "Content-Length: " + ss.str() + "\r\n" +
+				   "Connection: close\r\n" +
+				   "\r\n" +
+				   response;
 	}
 
-	std::string fileContent = readFile(file);
-	const std::string contentType = this->_determineContentType(file);
-	if (status.empty())
-		status = "200 OK";
-	this->_response = "HTTP/1.1 " + status + "\r\n" +
-					  "Content-Type: " + contentType + "\r\n" +
-					  "Content-Length: " + toString(fileContent.size()) + "\r\n\r\n" + fileContent;
+	this->_response = response;
 }
 
 const std::string Response::_determineContentType(const std::string &filename)
@@ -373,9 +408,4 @@ const std::string Response::_determineContentType(const std::string &filename)
 		return "application/vnd.ms-powerpoint";
 	else
 		return "application/octet-stream"; // Default binary file type
-}
-
-const std::string &Response::getResponse() const
-{
-	return this->_response;
 }

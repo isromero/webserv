@@ -32,7 +32,7 @@
 
 #define MAX_EVENTS 10000
 
-#include "errors.hpp"
+#include "status.hpp"
 #include "utils.hpp"
 #include "Socket.hpp"
 #include "Request.hpp"
