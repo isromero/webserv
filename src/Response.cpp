@@ -6,7 +6,7 @@
 /*   By: adgutier <adgutier@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/14 20:12:08 by adgutier         ###   ########.fr       */
+/*   Updated: 2024/08/15 19:08:39 by adgutier         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,9 +21,23 @@ Response::~Response()
 {
 }
 
+bool Response::_isCGIRequest(const std::string &requestedFile)
+{
+	if (requestedFile.find("/cgi-bin/") != std::string::npos ||
+		requestedFile.find(".cgi") != std::string::npos ||
+		requestedFile.find(".pl") != std::string::npos ||
+		requestedFile.find(".py") != std::string::npos)
+	{
+		return true;
+	}
+	return false;
+}
+
 const std::string &Response::handleMethods()
 {
-	if (this->_method == "GET")
+	if (_isCGIRequest(this->_requestedFile))  // Si no hay método HTTP y es un CGI, manejarlo
+		this->_handleCGI();
+	else if (this->_method == "GET")
 		this->_handleGET();
 	else if (this->_method == "POST")
 		this->_handlePOST();
@@ -31,6 +45,74 @@ const std::string &Response::handleMethods()
 		this->_handleDELETE();
 	return this->_response;
 }
+
+void Response::_handleCGI()
+{
+    int pipefd[2];
+    if (pipe(pipefd) == -1)
+    {
+        this->_response = "HTTP/1.1 500 Internal Server Error\r\n"
+                          "Content-Length: 0\r\n\r\n";
+        return;
+    }
+
+    pid_t pid = fork();
+    if (pid == -1) // Error en fork
+    {
+        this->_response = "HTTP/1.1 500 Internal Server Error\r\n"
+                          "Content-Length: 0\r\n\r\n";
+        return;
+    }
+    else if (pid == 0) // Proceso hijo
+    {
+        // Redirigir la salida estándar al pipe
+        close(pipefd[0]); // Cerramos la lectura en el hijo
+        dup2(pipefd[1], STDOUT_FILENO); // Redirigimos stdout al pipe
+        close(pipefd[1]); // Cerramos el extremo de escritura, ya que está redirigido
+
+        // Ejecutar el CGI
+        std::string scriptPath = "./pages" + this->_requestedFile; // Asegúrate de que apunte al script correcto
+		// std::cerr << "Script Path: " << scriptPath << std::endl;
+        char *args[] = {const_cast<char *>(scriptPath.c_str()), NULL};
+        execve(scriptPath.c_str(), args, environ);
+
+        // Si execve falla
+        exit(1);
+    }
+    else // Proceso padre
+    {
+        close(pipefd[1]); // Cerramos la escritura en el padre
+
+        // Leer la salida del CGI desde el pipe
+        char buffer[1024];
+        std::string cgiOutput;
+        ssize_t bytesRead;
+        while ((bytesRead = read(pipefd[0], buffer, sizeof(buffer))) > 0)
+        {
+            cgiOutput.append(buffer, bytesRead);
+        }
+        close(pipefd[0]); // Cerramos la lectura una vez finalizada
+
+        // Esperamos al hijo para evitar procesos zombis
+        waitpid(pid, NULL, 0);
+
+        // Si no hay salida del CGI, devolver un error
+        if (cgiOutput.empty())
+        {
+            this->_response = "HTTP/1.1 500 Internal Server Error\r\n"
+                              "Content-Length: 0\r\n\r\n";
+        }
+        else
+        {
+            // Crear la respuesta HTTP con la salida del CGI
+            this->_response = "HTTP/1.1 200 OK\r\n"
+                              "Content-Type: text/html\r\n" // Asegúrate de que esto sea correcto según el tipo de salida
+                              "Content-Length: " + toString(cgiOutput.size()) + "\r\n\r\n" +
+                              cgiOutput;
+        }
+    }
+}
+
 void Response::_handlePOST()
 {
 	std::string response;
@@ -85,47 +167,46 @@ void Response::_handlePOST()
 		}
 	}
 	else if (contentType == "application/x-www-form-urlencoded")
-{
-    bool valid = true;
-    size_t pos = 0;
+	{
+		bool valid = true;
+		size_t pos = 0;
 
-    // Itera sobre los parámetros separados por '&'
-    while (pos < body.length())
-    {
-        // Encuentra la posición del signo '=' para verificar si existe un valor para la clave
-        size_t eqPos = body.find('=', pos);
+		// Itera sobre los parámetros separados por '&'
+		while (pos < body.length())
+		{
+			// Encuentra la posición del signo '=' para verificar si existe un valor para la clave
+			size_t eqPos = body.find('=', pos);
 
-        // Si no se encuentra un '=', o está al principio o final, es un cuerpo malformado
-        if (eqPos == std::string::npos || eqPos == pos || eqPos == body.length() - 1)
-        {
-            valid = false;
-            break;
-        }
+			// Si no se encuentra un '=', o está al principio o final, es un cuerpo malformado
+			if (eqPos == std::string::npos || eqPos == pos || eqPos == body.length() - 1)
+			{
+				valid = false;
+				break;
+			}
 
-        // Encuentra el próximo '&' o final de la cadena
-        size_t ampPos = body.find('&', eqPos);
+			// Encuentra el próximo '&' o final de la cadena
+			size_t ampPos = body.find('&', eqPos);
 
-        // Si no hay más '&', termina el ciclo
-        if (ampPos == std::string::npos)
-        {
-            break;
-        }
-        
-        pos = ampPos + 1; // Mueve la posición al siguiente parámetro
-    }
+			// Si no hay más '&', termina el ciclo
+			if (ampPos == std::string::npos)
+			{
+				break;
+			}
 
-    if (valid)
-    {
-        status = "201 Created";
-        responseBody = "201 Created: Data received and processed successfully.";
-    }
-    else
-    {
-        status = "400 Bad Request";
-        responseBody = "400 Bad Request: Malformed application/x-www-form-urlencoded body.";
-    }
-}
+			pos = ampPos + 1; // Mueve la posición al siguiente parámetro
+		}
 
+		if (valid)
+		{
+			status = "201 Created";
+			responseBody = "201 Created: Data received and processed successfully.";
+		}
+		else
+		{
+			status = "400 Bad Request";
+			responseBody = "400 Bad Request: Malformed application/x-www-form-urlencoded body.";
+		}
+	}
 
 	else if (contentType == "multipart/form-data")
 	{
@@ -200,72 +281,69 @@ void Response::_handlePOST()
 
 void Response::_handleDELETE() // TODO: use this to test curl -X DELETE http://localhost:6969/file.html
 {
-    std::string response;
-    std::string status;
-    std::string file;
-    
-    // Determinar el archivo o recurso a eliminar
-    if (this->_requestedFile[this->_requestedFile.size() - 1] == '/') // Si es un directorio, no se elimina
-    {
-        status = "400 Bad Request";
-        response = "400 Bad Request: Directory deletion is not allowed.";
-    }
-    else
-    {
-        file = "pages" + this->_requestedFile;
+	std::string response;
+	std::string status;
+	std::string file;
 
-        // Verificar si el archivo existe
-        if (access(file.c_str(), F_OK) != 0)
-        {
-            status = "404 Not Found";
-            file = "pages/404.html";
-            response = readFile(file);
-        }
-        else
-        {
-            // Intentar eliminar el archivo
-            if (remove(file.c_str()) != 0)
-            {
-                status = "403 Forbidden";
-                file = "pages/403.html";
-                response = readFile(file);
-            }
-            else
-            {
-                // En caso de éxito, enviar 204 No Content o 200 OK según la implementación
-                // Aquí asumimos que si el archivo se elimina correctamente, no hay contenido adicional
-                status = "204 No Content";
-                response.clear(); // Sin contenido
-            }
-        }
-    }
+	// Determinar el archivo o recurso a eliminar
+	if (this->_requestedFile[this->_requestedFile.size() - 1] == '/') // Si es un directorio, no se elimina
+	{
+		status = "400 Bad Request";
+		response = "400 Bad Request: Directory deletion is not allowed.";
+	}
+	else
+	{
+		file = "pages" + this->_requestedFile;
 
-    // Construir la respuesta
-    if (status == "204 No Content")
-    {
-        response = "HTTP/1.1 " + status + "\r\n" +
-                   "Connection: close\r\n" +
-                   "\r\n";
-    }
-    else
-    {
-        // Para códigos de estado de error, la respuesta se obtiene del archivo HTML correspondiente
-        const std::string contentType = "text/html";
-        std::ostringstream ss;
-        ss << response.size();
-        response = "HTTP/1.1 " + status + "\r\n" +
-                   "Content-Type: " + contentType + "\r\n" +
-                   "Content-Length: " + ss.str() + "\r\n" +
-                   "Connection: close\r\n" +
-                   "\r\n" +
-                   response;
-    }
+		// Verificar si el archivo existe
+		if (access(file.c_str(), F_OK) != 0)
+		{
+			status = "404 Not Found";
+			file = "pages/404.html";
+			response = readFile(file);
+		}
+		else
+		{
+			// Intentar eliminar el archivo
+			if (remove(file.c_str()) != 0)
+			{
+				status = "403 Forbidden";
+				file = "pages/403.html";
+				response = readFile(file);
+			}
+			else
+			{
+				// En caso de éxito, enviar 204 No Content o 200 OK según la implementación
+				// Aquí asumimos que si el archivo se elimina correctamente, no hay contenido adicional
+				status = "204 No Content";
+				response.clear(); // Sin contenido
+			}
+		}
+	}
 
-    this->_response = response;
+	// Construir la respuesta
+	if (status == "204 No Content")
+	{
+		response = "HTTP/1.1 " + status + "\r\n" +
+				   "Connection: close\r\n" +
+				   "\r\n";
+	}
+	else
+	{
+		// Para códigos de estado de error, la respuesta se obtiene del archivo HTML correspondiente
+		const std::string contentType = "text/html";
+		std::ostringstream ss;
+		ss << response.size();
+		response = "HTTP/1.1 " + status + "\r\n" +
+				   "Content-Type: " + contentType + "\r\n" +
+				   "Content-Length: " + ss.str() + "\r\n" +
+				   "Connection: close\r\n" +
+				   "\r\n" +
+				   response;
+	}
+
+	this->_response = response;
 }
-
-
-
 
 void Response::_handleGET()
 {

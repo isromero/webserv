@@ -6,7 +6,7 @@
 /*   By: adgutier <adgutier@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:52:54 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/14 19:59:24 by adgutier         ###   ########.fr       */
+/*   Updated: 2024/08/15 17:45:14 by adgutier         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,6 +17,9 @@
 #include <string>
 #include <map>
 #include <unistd.h>
+#include <cstdlib>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include "errors.hpp"
 #include "utils.hpp"
@@ -34,6 +37,8 @@ private:
 	void _handleGET();
 	void _handlePOST();
 	void _handleDELETE();
+	void _handleCGI();
+	bool _isCGIRequest(const std::string& requestedFile);
 
 	const std::string _determineContentType(const std::string &filename);
 
