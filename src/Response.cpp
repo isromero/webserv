@@ -6,14 +6,14 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/15 11:19:55 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/16 22:01:51 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Response.hpp"
 
 Response::Response(const std::string &request, const std::string &method, const std::string &requestedFile, const std::map<std::string, std::string> &headers, const std::string &body)
-	: _response(""), _request(request), _method(method), _requestedFile(requestedFile), _headers(headers), _body(body)
+	: _response(""), _request(request), _method(method), _requestedFile(requestedFile), _requestHeaders(headers), _requestBody(body), _responseHeaders(), _responseBody(""), _responseFile(""), _locationHeader("")
 {
 }
 
@@ -23,46 +23,84 @@ Response::~Response()
 
 const std::string Response::handleResponse(StatusCode statusCode)
 {
-	std::string statusLine, body;
+	std::string statusLine;
+	bool isError = false;
 
 	switch (statusCode)
 	{
+	case SUCCESS_200:
+		statusLine = "HTTP/1.1 200 OK";
+		this->_responseBody = readFile(this->_responseFile);
+		break;
+	case SUCCESS_201:
+		statusLine = "HTTP/1.1 201 Created";
+		this->_responseBody = "201 Created: The request was successful and a new resource was created.";
+		break;
 	case ERROR_400:
 		statusLine = "HTTP/1.1 400 Bad Request";
-		body = "400 Bad Request: The server cannot process the request due to a client error.";
+		this->_responseBody = "400 Bad Request: The server cannot process the request due to a client error.";
+		isError = true;
 		break;
 	case ERROR_405:
 		statusLine = "HTTP/1.1 405 Method Not Allowed";
-		body = "405 Method Not Allowed: The method specified in the request is not allowed.";
+		this->_responseBody = "405 Method Not Allowed: The method specified in the request is not allowed.";
+		isError = true;
 		break;
 	case ERROR_411:
 		statusLine = "HTTP/1.1 411 Length Required";
-		body = "411 Length Required: The request did not specify the length of its content.";
+		this->_responseBody = "411 Length Required: The request did not specify the length of its content.";
+		isError = true;
 		break;
 	case ERROR_413:
 		statusLine = "HTTP/1.1 413 Payload Too Large";
-		body = "413 Payload Too Large: The request is larger than the server is willing or able to process.";
+		this->_responseBody = "413 Payload Too Large: The request is larger than the server is willing or able to process.";
+		isError = true;
 		break;
 	case ERROR_414:
 		statusLine = "HTTP/1.1 414 URI Too Long";
-		body = "414 URI Too Long: The URI provided was too long for the server to process.";
+		this->_responseBody = "414 URI Too Long: The URI provided was too long for the server to process.";
+		isError = true;
+		break;
+	case ERROR_415:
+		statusLine = "HTTP/1.1 415 Unsupported Media Type";
+		this->_responseBody = "415 Unsupported Media Type: The server cannot handle this content type.";
+		isError = true;
+		break;
+	case ERROR_500:
+		statusLine = "HTTP/1.1 500 Internal Server Error";
+		this->_responseBody = "500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.";
+		isError = true;
 		break;
 	case ERROR_505:
 		statusLine = "HTTP/1.1 505 HTTP Version Not Supported";
-		body = "505 HTTP Version Not Supported: The HTTP version used in the request is not supported by the server.";
+		this->_responseBody = "505 HTTP Version Not Supported: The HTTP version used in the request is not supported by the server.";
+		isError = true;
 		break;
 	default:
 		statusLine = "HTTP/1.1 500 Internal Server Error";
-		body = "500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.";
+		this->_responseBody = "500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.";
+		isError = true;
 		break;
 	}
 
-	std::string response = statusLine + "\r\n";
-	response += "Content-Type: text/plain\r\n"; // TODO: Create function to create error pages with html and don't return text/plain???
-	response += "Content-Length: " + toString(body.size()) + "\r\n\r\n";
-	response += body;
+	// Build the response
 
-	return response;
+	// if isError is true, the content type will be text/html because we return an error message
+	if (isError)
+		this->_responseHeaders["Content-Type"] = this->_determineContentType("text/html");
+	else
+		this->_responseHeaders["Content-Type"] = this->_determineContentType(this->_responseFile);
+
+	this->_responseHeaders["Content-Length"] = toString(this->_responseBody.size());
+
+	// TODO: Create function to create error pages with html???
+	this->_response = statusLine + "\r\n";
+	for (std::map<std::string, std::string>::iterator it = this->_responseHeaders.begin(); it != this->_responseHeaders.end(); ++it)
+		this->_response += it->first + ": " + it->second + "\r\n"; // Add all headers to response
+	this->_response += "\r\n";
+	this->_response += this->_responseBody;
+
+	return this->_response;
 }
 
 StatusCode Response::handleMethods()
@@ -76,166 +114,142 @@ StatusCode Response::handleMethods()
 	return NO_STATUS_CODE; // Impossible to reach this point
 }
 
-void Response::_handleGET()
+StatusCode Response::_handleGET()
 {
-	// TODO: Refactor and check the requested file here?????
-	std::string file;
-	std::string status;
-
 	if (this->_requestedFile[this->_requestedFile.size() - 1] == '/') // If is a directory just serve the index.html or index.htm
 	{
 		if (access(("pages" + this->_requestedFile + "index.html").c_str(), F_OK) == 0)
-			file = "pages" + this->_requestedFile + "index.html";
+			this->_responseFile = "pages" + this->_requestedFile + "index.html";
 		else if (access(("pages" + this->_requestedFile + "index.htm").c_str(), F_OK) == 0)
-			file = "pages" + this->_requestedFile + "index.htm";
+			this->_responseFile = "pages" + this->_requestedFile + "index.htm";
 	}
 	else
-		file = "pages" + this->_requestedFile;
+		this->_responseFile = "pages" + this->_requestedFile;
 
 	// Check if the file has an extension, if not add .html
-	if (file.find_last_of(".") == std::string::npos)
-		file += ".html";
+	if (this->_responseFile.find_last_of(".") == std::string::npos)
+		this->_responseFile += ".html";
 
 	// Check if the file exists
-	if (access(file.c_str(), F_OK) != 0)
-	{
-		status = "404 Not Found";
-		file = "pages/404.html";
-	}
+	if (access(this->_responseFile.c_str(), F_OK) != 0)
+		return ERROR_404;
 	else
 	{
 		// Check if the file is readable
-		if (access(file.c_str(), R_OK) != 0)
-		{
-			status = "403 Forbidden";
-			file = "pages/403.html"; // ! TODO: this need to be an error page file variable or something like that
-		}
+		if (access(this->_responseFile.c_str(), R_OK) != 0)
+			return ERROR_403;
 		else
-			status = "200 OK";
+			return SUCCESS_200;
 	}
 
-	std::string fileContent = readFile(file);
-	const std::string contentType = this->_determineContentType(file);
-	if (status.empty())
-		status = "200 OK";
-	this->_response = "HTTP/1.1 " + status + "\r\n" +
-					  "Content-Type: " + contentType + "\r\n" +
-					  "Content-Length: " + toString(fileContent.size()) + "\r\n\r\n" + fileContent;
+	return NO_STATUS_CODE; // Impossible to reach this point
 }
 
 StatusCode Response::_handlePOST()
 {
-	// ! TODO: refactor this method to use the variables(body, headers, etc) of the Response class
-	std::string response;
-	std::string status = "400 Bad Request";
-	std::string responseBody = "400 Bad Request: Malformed POST request.";
-	std::string contentType;
-	std::string body;
 	std::string locationHeader;
 
-	// Obtener el cuerpo y Content-Type
-	size_t headerEnd = this->_request.find("\r\n\r\n");
-	if (headerEnd != std::string::npos)
+	if (this->_requestHeaders["Content-Type"] == "application/json")
 	{
-		body = this->_request.substr(headerEnd + 4);
-
-		size_t contentTypeStart = this->_request.find("Content-Type: ");
-		if (contentTypeStart != std::string::npos)
-		{
-			size_t contentTypeEnd = this->_request.find("\r\n", contentTypeStart);
-			contentType = this->_request.substr(contentTypeStart + 14, contentTypeEnd - contentTypeStart - 14);
-		}
-	}
-
-	// Verificar Content-Type y manejar el cuerpo
-	if (body.empty())
-	{
-		if (contentType.empty())
-			return ERROR_400;
-		else
-			return ERROR_400;
-	}
-	else if (contentType == "application/json")
-	{
-		// Verificación básica de JSON
 		if (body.size() >= 2 && body[0] == '{' && body[body.size() - 1] == '}')
 		{
-			// Crear un nuevo recurso y devolver su ubicación
-			status = "201 Created";
-			responseBody = "201 Created: Data received and processed successfully.";
-			locationHeader = "/new/resource/identifier"; // Ejemplo de URI del nuevo recurso creado // ! TODO: locationHeader will need to be pushed inside of the map headers
+			this->_locationHeader = "pages/uploads/" + getFilenameAndDate("file.json");
+			return SUCCESS_201;
 		}
 		else
-		{
-			status = "400 Bad Request";
-			responseBody = "400 Bad Request: Malformed JSON body.";
-		}
+			return ERROR_400;
 	}
-	else if (contentType == "application/x-www-form-urlencoded")
+	else if (this->_requestHeaders["Content-Type"] == "application/x-www-form-urlencoded") // This is the typical form data "key=value&key2=value2"
 	{
 		bool valid = true;
 		size_t pos = 0;
 
-		// Itera sobre los parámetros separados por '&'
 		while (pos < body.length())
 		{
-			// Encuentra la posición del signo '=' para verificar si existe un valor para la clave
 			size_t eqPos = body.find('=', pos);
-
-			// Si no se encuentra un '=', o está al principio o final, es un cuerpo malformado
 			if (eqPos == std::string::npos || eqPos == pos || eqPos == body.length() - 1)
 			{
 				valid = false;
 				break;
 			}
 
-			// Encuentra el próximo '&' o final de la cadena
 			size_t ampPos = body.find('&', eqPos);
-
-			// Si no hay más '&', termina el ciclo
 			if (ampPos == std::string::npos)
-			{
 				break;
-			}
 
-			pos = ampPos + 1; // Mueve la posición al siguiente parámetro
+			pos = ampPos + 1; // Move to the next key=value pair
 		}
 
 		if (valid)
-		{
-			status = "201 Created";
-			responseBody = "201 Created: Data received and processed successfully.";
-		}
+			return SUCCESS_201; // TODO: this is not 200??
 		else
-		{
-			status = "400 Bad Request";
-			responseBody = "400 Bad Request: Malformed application/x-www-form-urlencoded body.";
-		}
+			return ERROR_400;
 	}
-
-	else if (contentType == "multipart/form-data")
+	else if (this->_requestHeaders["Content-Type"] == "multipart/form-data") // This is a more complex form data like file uploads
 	{
-		// Verificación básica del boundary
-		size_t boundaryStart = this->_request.find("boundary=");
+		// Boundary is something like "----WebKitFormBoundary7MA4YWxkTrZu0gW" and it is in the Content-Type header
+		size_t boundaryStart = this->_requestHeaders["Content-Type"].find("boundary=");
 		if (boundaryStart != std::string::npos)
 		{
-			std::string boundary = this->_request.substr(boundaryStart + 9);
-			if (body.find(boundary) != std::string::npos)
+			std::string boundary = this->_requestHeaders["Content-Type"].substr(boundaryStart + 9);
+			if (this->_requestBody.find(boundary) != std::string::npos)
 			{
-				status = "415 Unsupported Media Type";
-				responseBody = "415 Unsupported Media Type: The server cannot handle this content type.";
+				std::string delimiter = "--" + boundary;
+				size_t pos = 0;
+				size_t nextPos;
+
+				// TODO: Check functionality, i think is broken, does not make sense using body for extract headers, etc
+				while ((pos = this->_requestBody.find(delimiter, pos)) != std::string::npos)
+				{
+					pos += delimiter.length();
+					nextPos = this->_requestBody.find(delimiter, pos);
+
+					if (nextPos == std::string::npos)
+						break;
+
+					std::string part = this->_requestBody.substr(pos, nextPos - pos);
+
+					// Process this part
+					size_t headerEnd = part.find("\r\n\r\n");
+					if (headerEnd == std::string::npos)
+						return ERROR_400;
+
+					std::string headers = part.substr(0, headerEnd);
+					std::string content = part.substr(headerEnd + 4);
+
+					// Extract filename from headers
+					size_t filenamePos = headers.find("filename=\"");
+					if (filenamePos != std::string::npos)
+					{
+						size_t filenameEnd = headers.find("\"", filenamePos + 10);
+						if (filenameEnd != std::string::npos)
+						{
+							std::string filename = headers.substr(filenamePos + 10, filenameEnd - filenamePos - 10);
+
+							// Save the file
+							std::string filepath = "pages/uploads/" + getFilenameAndDate(filename);
+							std::ofstream file(filepath.c_str(), std::ios::binary); // TODO: hacer una función a parte para guardar archivos y utilizarla ya en el handleResponse?
+							if (file.is_open())
+							{
+								file.write(content.c_str(), content.length());
+								file.close();
+								this->_locationHeader = filepath;
+							}
+							else
+								return ERROR_500;
+						}
+					}
+					else
+						return ERROR_400;
+					pos = nextPos;
+				}
+				return SUCCESS_201;
 			}
 			else
-			{
-				status = "400 Bad Request";
-				responseBody = "400 Bad Request: Malformed multipart/form-data body.";
-			}
+				return ERROR_400;
 		}
 		else
-		{
-			status = "400 Bad Request";
-			responseBody = "400 Bad Request: Malformed multipart/form-data. Boundary missing.";
-		}
+			return ERROR_400;
 	}
 	else if (contentType == "text/plain")
 	{
@@ -256,10 +270,7 @@ StatusCode Response::_handlePOST()
 		}
 	}
 	else
-	{
-		status = "415 Unsupported Media Type";
-		responseBody = "415 Unsupported Media Type: The server cannot handle this content type.";
-	}
+		return ERROR_415;
 
 	// Construir la respuesta
 	std::ostringstream ss;

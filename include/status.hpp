@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:42:33 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/15 10:54:38 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/16 21:54:19 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,14 +20,17 @@ enum StatusCode
 {
 	NO_STATUS_CODE,
 	ERROR_400,
+	ERROR_403,
+	ERROR_404,
 	ERROR_405,
 	ERROR_411,
 	ERROR_413,
 	ERROR_414,
+	ERROR_415,
+	ERROR_500,
 	ERROR_505,
 	SUCCESS_200,
 	SUCCESS_201,
-	SUCCESS_202,
 	SUCCESS_204,
 	SUCCESS_206,
 	SUCCESS_301,

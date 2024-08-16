@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:52:54 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/15 11:21:21 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/16 21:12:28 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,8 +28,12 @@ private:
 	std::string _request;
 	std::string _method;
 	std::string _requestedFile;
-	std::map<std::string, std::string> _headers; // TODO: This is not headers, this is requestHeaders, and then create another for the response
-	std::string _body;							 // TODO: This is not body, this is requestHeaders, and then create another for the response
+	std::map<std::string, std::string> _requestHeaders;
+	std::string _requestBody;
+	std::map<std::string, std::string> _responseHeaders;
+	std::string _responseBody;
+	std::string _responseFile;
+	std::string _locationHeader;
 
 	StatusCode _handleGET();
 	StatusCode _handlePOST();

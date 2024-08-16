@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:44:05 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/15 10:55:49 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/16 21:29:08 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -207,7 +207,7 @@ StatusCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &contentLengt
 			this->_headers[headerName] = headerValue;
 		}
 		else
-			return INVALID_HEADER_FORMAT;
+			return ERROR_400;
 
 		pos = end + 1;
 		if (this->_request[pos] == '\n')
@@ -217,7 +217,7 @@ StatusCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &contentLengt
 	// Check for Host header is only one(it is necessary just one)
 	size_t hostCount = this->_headers.count("Host");
 	if (hostCount != 1)
-		return INVALID_HEADER_FORMAT;
+		return ERROR_400;
 
 	// Check for Host header value
 	std::map<std::string, std::string>::iterator hostIt = this->_headers.find("Host");
@@ -226,7 +226,7 @@ StatusCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &contentLengt
 	oss << "localhost:" << this->_serverPort; // TODO: Change host when we have the config file
 	std::string hostWithPort = oss.str();
 	if (hostValue.empty() || (hostValue != hostWithPort && hostValue != "localhost")) // TODO: Change hosts when we have the config file
-		return INVALID_HEADER_FORMAT;
+		return ERROR_400;
 
 	// Check for Content-Length
 	std::map<std::string, std::string>::iterator it = this->_headers.find("Content-Length");
@@ -237,10 +237,10 @@ StatusCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &contentLengt
 		// No Content-Length specified, check for Transfer-Encoding
 		it = this->_headers.find("Transfer-Encoding");
 		if (it != this->_headers.end() && it->second == "chunked") // Actually, we don't support chunked encoding
-			return INVALID_CONTENT_LENGTH;
+			return ERROR_411;
 	}
 
-	return NO_ERROR;
+	return NO_STATUS_CODE;
 }
 
 StatusCode Request::_parseBody(size_t &pos, size_t &contentLength)
@@ -249,7 +249,7 @@ StatusCode Request::_parseBody(size_t &pos, size_t &contentLength)
 	if (contentLength > 0)
 	{
 		if (remainingLength < contentLength)
-			return INCOMPLETE_BODY;
+			return ERROR_400;
 		this->_body = this->_request.substr(pos, contentLength);
 	}
 	else if (remainingLength > 0)
@@ -262,7 +262,7 @@ StatusCode Request::_parseBody(size_t &pos, size_t &contentLength)
 			this->_body[i] = ' ';
 	}
 
-	return NO_ERROR;
+	return NO_STATUS_CODE;
 }
 
 const std::string &Request::getRequest() const

@@ -192,7 +192,7 @@ std::string Server::_processRequestResponse(int clientfd)
 	Response response(request.getRequest(), request.getMethod(), request.getRequestedFile(), request.getHeaders(), request.getBody());
 
 	statusCode = response.handleMethods(); // statusCode never is going to be NO_STATUS_CODE, will be an error or success
-	return response.handleResponse();
+	return response.handleResponse(statusCode);
 }
 
 void Server::_sendResponse(int clientfd, const std::string &response)
