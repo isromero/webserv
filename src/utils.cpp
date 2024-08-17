@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:29:36 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/16 21:58:18 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/17 11:38:34 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -66,4 +66,18 @@ std::string getFilenameAndDate(const std::string &originalName)
 
 	ss << baseName << extension;
 	return ss.str();
+}
+
+bool saveFile(const std::string &content, const std::string &filename, std::string &savedPath)
+{
+	std::string filepath = "pages/uploads/" + getFilenameAndDate(filename);
+	std::ofstream file(filepath.c_str(), std::ios::binary);
+	if (file.is_open())
+	{
+		file.write(content.c_str(), content.length());
+		file.close();
+		savedPath = filepath;
+		return true;
+	}
+	return false;
 }

@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:42:33 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/16 21:54:19 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/17 12:51:06 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -32,11 +32,6 @@ enum StatusCode
 	SUCCESS_200,
 	SUCCESS_201,
 	SUCCESS_204,
-	SUCCESS_206,
-	SUCCESS_301,
-	SUCCESS_302,
-	SUCCESS_303,
-	SUCCESS_304,
 };
 
 #endif
