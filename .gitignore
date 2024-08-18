@@ -34,3 +34,6 @@
 # Project files
 objs/
 webserv
+
+
+.DS_Store
