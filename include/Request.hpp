@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Request.hpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: adgutier <adgutier@student.42madrid.com    +#+  +:+       +#+        */
+/*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:42:12 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/14 18:08:01 by adgutier         ###   ########.fr       */
+/*   Updated: 2024/08/18 13:45:05 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,7 +22,7 @@
 #include <cstring>
 #include <cstdlib>
 
-#include "errors.hpp"
+#include "status.hpp"
 #include "utils.hpp"
 
 class Request
@@ -37,15 +37,15 @@ private:
 
 	void _readRequest(int clientfd);
 
-	StatusErrorCode _parseRequestLine(size_t &pos, size_t &end);
-	StatusErrorCode _parseHeaders(size_t &pos, size_t &end, size_t &contentLength);
-	StatusErrorCode _parseBody(size_t &pos, size_t &contentLength);
+	StatusCode _parseRequestLine(size_t &pos, size_t &end);
+	StatusCode _parseHeaders(size_t &pos, size_t &end, size_t &contentLength);
+	StatusCode _parseBody(size_t &pos, size_t &contentLength);
 
 public:
 	Request(int clientfd, int serverPort);
 	~Request();
 
-	StatusErrorCode parseRequest();
+	StatusCode parseRequest();
 
 	const std::string &getRequest() const;
 	const std::string &getMethod() const;

@@ -3,67 +3,14 @@
 /*                                                        :::      ::::::::   */
 /*   utils.cpp                                          :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
+/*   By: adgutier <adgutier@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:29:36 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/14 16:41:31 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/18 17:25:27 by adgutier         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "utils.hpp"
-
-const std::string generateStatusError(StatusErrorCode error)
-{
-	std::string statusLine, body;
-
-	switch (error)
-	{
-	case INVALID_REQUEST:
-	case INVALID_REQUEST_LINE:
-	case INVALID_HEADER_FORMAT:
-	case INCOMPLETE_BODY:
-	case INVALID_REQUEST_TARGET:
-		statusLine = "HTTP/1.1 400 Bad Request";
-		body = "400 Bad Request: The server cannot process the request due to a client error.";
-		break;
-	case INVALID_METHOD:
-		statusLine = "HTTP/1.1 405 Method Not Allowed";
-		body = "405 Method Not Allowed: The method specified in the request is not allowed.";
-		break;
-	case INVALID_CONTENT_LENGTH:
-		statusLine = "HTTP/1.1 411 Length Required";
-		body = "411 Length Required: The request did not specify the length of its content.";
-		break;
-	case PAYLOAD_TOO_LARGE:
-		statusLine = "HTTP/1.1 413 Payload Too Large";
-		body = "413 Payload Too Large: The request is larger than the server is willing or able to process.";
-		break;
-	case URI_TOO_LONG:
-		statusLine = "HTTP/1.1 414 URI Too Long";
-		body = "414 URI Too Long: The URI provided was too long for the server to process.";
-		break;
-	case VERSION_NOT_SUPPORTED:
-		statusLine = "HTTP/1.1 505 HTTP Version Not Supported";
-		body = "505 HTTP Version Not Supported: The HTTP version used in the request is not supported by the server.";
-		break;
-	default:
-		statusLine = "HTTP/1.1 500 Internal Server Error";
-		body = "500 Internal Server Error: The server encountered an unexpected condition that prevented it from fulfilling the request.";
-		break;
-	}
-
-	std::string response = statusLine + "\r\n";
-	response += "Content-Type: text/plain\r\n"; // TODO: Create function to create error pages with html and don't return text/plain???
-
-	std::stringstream ss;
-	ss << body.size();
-	response += "Content-Length: " + ss.str() + "\r\n";
-
-	response += "\r\n";
-	response += body;
-
-	return response;
-}
 
 std::string secureFilePath(const std::string &path)
 {
@@ -84,7 +31,7 @@ std::string secureFilePath(const std::string &path)
 
 std::string readFile(const std::string &filename)
 {
-	std::ifstream file(filename.c_str());
+	std::ifstream file(filename.c_str(), std::ios::binary); // Open the file in binary mode because there's no conversion like this, so is safer
 	if (!file.is_open())
 	{
 		std::cerr << "Error: opening the file: " << strerror(errno) << std::endl;
@@ -94,4 +41,43 @@ std::string readFile(const std::string &filename)
 	ss << file.rdbuf();
 	file.close();
 	return ss.str();
+}
+
+std::string getFilenameAndDate(const std::string &originalName)
+{
+	time_t now = time(0);
+	struct tm *ltm = localtime(&now);
+
+	std::ostringstream ss;
+	ss << std::setfill('0')
+	   << std::setw(4) << (1900 + ltm->tm_year)
+	   << std::setw(2) << (1 + ltm->tm_mon)
+	   << std::setw(2) << ltm->tm_mday
+	   << "_"
+	   << std::setw(2) << ltm->tm_hour
+	   << std::setw(2) << ltm->tm_min
+	   << std::setw(2) << ltm->tm_sec
+	   << "_";
+
+	// Get the base name and the extension
+	size_t dotPos = originalName.find_last_of(".");
+	std::string baseName = (dotPos == std::string::npos) ? originalName : originalName.substr(0, dotPos);
+	std::string extension = (dotPos == std::string::npos) ? "" : originalName.substr(dotPos);
+
+	ss << baseName << extension;
+	return ss.str();
+}
+
+bool saveFile(const std::string &content, const std::string &filename, std::string &savedPath)
+{
+	std::string filepath = "pages/uploads/" + getFilenameAndDate(filename);
+	std::ofstream file(filepath.c_str(), std::ios::binary);
+	if (file.is_open())
+	{
+		file.write(content.c_str(), content.size());
+		file.close();
+		savedPath = filepath;
+		return true;
+	}
+	return false;
 }

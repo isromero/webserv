@@ -6,7 +6,7 @@
 /*   By: adgutier <adgutier@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:44:05 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/14 18:07:27 by adgutier         ###   ########.fr       */
+/*   Updated: 2024/08/18 17:07:30 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,12 +24,43 @@ void Request::_readRequest(int clientfd)
 	// Just read the data from the client
 	char buffer[1024];
 	ssize_t bytesRead;
+	bool headersRead = false;
+	size_t contentLength = 0;
+	size_t totalBodyRead = 0;
+
 	while ((bytesRead = recv(clientfd, buffer, sizeof(buffer) - 1, 0)) > 0)
 	{
 		buffer[bytesRead] = '\0';
 		this->_request.append(buffer, bytesRead);
-		if (this->_request.find("\r\n\r\n") != std::string::npos)
+
+		if (!headersRead)
+		{
+			size_t pos = this->_request.find("\r\n\r\n");
+			if (pos != std::string::npos)
+			{
+				headersRead = true;
+
+				std::string headers = this->_request.substr(0, pos);
+				size_t contentLengthPos = headers.find("Content-Length: ");
+				if (contentLengthPos != std::string::npos)
+				{
+					contentLengthPos += 16; // "Content-Length: " is 16 characters long
+					size_t endOfLength = headers.find("\r\n", contentLengthPos);
+					if (endOfLength != std::string::npos)
+						contentLength = std::atoi(headers.substr(contentLengthPos, endOfLength - contentLengthPos).c_str()); // Get the content length number
+				}
+				// Calculate the total body read
+				totalBodyRead = this->_request.size() - (pos + 4);
+			}
+		}
+		else
+			totalBodyRead += bytesRead;
+
+		if (headersRead && totalBodyRead >= contentLength)
 			break;
+
+		if (this->_request.size() > 102400) // ! Maximum request size: we can change this value
+			break;							// Request too large, then in parsing we return 400
 	}
 	if (bytesRead == -1)
 	{
@@ -45,35 +76,35 @@ void Request::_readRequest(int clientfd)
 }
 
 // Parsing Request following RFC 9112
-StatusErrorCode Request::parseRequest()
+StatusCode Request::parseRequest()
 {
 	if (this->_request.empty())
-		return INVALID_REQUEST;
-	else if (this->_request.size() > 8192) // ! Maximum request size:  we can change this value
-		return PAYLOAD_TOO_LARGE;
+		return ERROR_400;
+	else if (this->_request.size() >= 102400) // ! Maximum request size:  we can change this value
+		return ERROR_400;
 
 	size_t pos = 0;
 	size_t end = 0;
 	size_t contentLength = 0;
 
-	StatusErrorCode error = NO_ERROR;
+	StatusCode statusCode = NO_STATUS_CODE;
 
-	error = this->_parseRequestLine(pos, end);
-	if (error != NO_ERROR)
-		return error;
+	statusCode = this->_parseRequestLine(pos, end);
+	if (statusCode != NO_STATUS_CODE)
+		return statusCode;
 
-	error = this->_parseHeaders(pos, end, contentLength);
-	if (error != NO_ERROR)
-		return error;
+	statusCode = this->_parseHeaders(pos, end, contentLength);
+	if (statusCode != NO_STATUS_CODE)
+		return statusCode;
 
-	error = this->_parseBody(pos, contentLength);
-	if (error != NO_ERROR)
-		return error;
+	statusCode = this->_parseBody(pos, contentLength);
+	if (statusCode != NO_STATUS_CODE)
+		return statusCode;
 
-	return NO_ERROR;
+	return NO_STATUS_CODE;
 }
 
-StatusErrorCode Request::_parseRequestLine(size_t &pos, size_t &end)
+StatusCode Request::_parseRequestLine(size_t &pos, size_t &end)
 {
 	// Leading empty lines prior to the request-line
 	while (pos < this->_request.size() && (this->_request[pos] == '\r' || this->_request[pos] == '\n'))
@@ -90,7 +121,7 @@ StatusErrorCode Request::_parseRequestLine(size_t &pos, size_t &end)
 	{
 		end = this->_request.find('\n', pos);
 		if (end == std::string::npos)
-			return INVALID_REQUEST;
+			return ERROR_400;
 	}
 
 	std::string requestLine = this->_request.substr(pos, end - pos);
@@ -103,15 +134,15 @@ StatusErrorCode Request::_parseRequestLine(size_t &pos, size_t &end)
 	{
 		this->_method = requestLine.substr(0, methodEnd);
 		if (this->_method != "GET" && this->_method != "POST" && this->_method != "DELETE") // TODO: Change if we add more methods
-			return INVALID_METHOD;
+			return ERROR_405;
 
 		std::string version = requestLine.substr(versionStart);
 		if (version != "HTTP/1.1")
-			return VERSION_NOT_SUPPORTED;
+			return ERROR_505;
 
 		std::string uri = requestLine.substr(fileStart, fileEnd - fileStart);
 		if (uri.size() > 2048) // ! Maximum URI size: we can change this value
-			return URI_TOO_LONG;
+			return ERROR_414;
 		if (uri.find("://") != std::string::npos)
 		{
 			// Absolute-form request, extract path after the authority. Eg: GET http://localhost:6969/index.html HTTP/1.1
@@ -124,13 +155,13 @@ StatusErrorCode Request::_parseRequestLine(size_t &pos, size_t &end)
 		else
 			this->_requestedFile = uri; // Relative-form this->_request. Eg: GET /index.html HTTP/1.1
 		if (this->_requestedFile.find(' ') != std::string::npos || this->_requestedFile.empty())
-			return INVALID_REQUEST_TARGET;
+			return ERROR_400;
 		this->_requestedFile = secureFilePath(this->_requestedFile);
 	}
 	else if (requestLine.find("HTTP/1.1") == std::string::npos)
-		return VERSION_NOT_SUPPORTED;
+		return ERROR_505;
 	else
-		return INVALID_REQUEST_LINE;
+		return ERROR_400;
 
 	pos = end + 1;
 	if (this->_request[pos] == '\n')
@@ -165,10 +196,10 @@ StatusErrorCode Request::_parseRequestLine(size_t &pos, size_t &end)
 		}
 	}
 
-	return NO_ERROR;
+	return NO_STATUS_CODE;
 }
 
-StatusErrorCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &contentLength)
+StatusCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &contentLength)
 {
 	// Parse headers
 	while (pos < this->_request.size())
@@ -207,7 +238,7 @@ StatusErrorCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &content
 			this->_headers[headerName] = headerValue;
 		}
 		else
-			return INVALID_HEADER_FORMAT;
+			return ERROR_400;
 
 		pos = end + 1;
 		if (this->_request[pos] == '\n')
@@ -217,7 +248,7 @@ StatusErrorCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &content
 	// Check for Host header is only one(it is necessary just one)
 	size_t hostCount = this->_headers.count("Host");
 	if (hostCount != 1)
-		return INVALID_HEADER_FORMAT;
+		return ERROR_400;
 
 	// Check for Host header value
 	std::map<std::string, std::string>::iterator hostIt = this->_headers.find("Host");
@@ -226,7 +257,7 @@ StatusErrorCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &content
 	oss << "localhost:" << this->_serverPort; // TODO: Change host when we have the config file
 	std::string hostWithPort = oss.str();
 	if (hostValue.empty() || (hostValue != hostWithPort && hostValue != "localhost")) // TODO: Change hosts when we have the config file
-		return INVALID_HEADER_FORMAT;
+		return ERROR_400;
 
 	// Check for Content-Length
 	std::map<std::string, std::string>::iterator it = this->_headers.find("Content-Length");
@@ -237,32 +268,26 @@ StatusErrorCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &content
 		// No Content-Length specified, check for Transfer-Encoding
 		it = this->_headers.find("Transfer-Encoding");
 		if (it != this->_headers.end() && it->second == "chunked") // Actually, we don't support chunked encoding
-			return INVALID_CONTENT_LENGTH;
+			return ERROR_411;
 	}
 
-	return NO_ERROR;
+	return NO_STATUS_CODE;
 }
 
-StatusErrorCode Request::_parseBody(size_t &pos, size_t &contentLength)
+StatusCode Request::_parseBody(size_t &pos, size_t &contentLength)
 {
 	size_t remainingLength = this->_request.size() - pos;
+
 	if (contentLength > 0)
 	{
 		if (remainingLength < contentLength)
-			return INCOMPLETE_BODY;
+			return ERROR_400;
 		this->_body = this->_request.substr(pos, contentLength);
 	}
 	else if (remainingLength > 0)
 		this->_body = this->_request.substr(pos); // No Content-Length specified, consume the remaining data
 
-	// Replace bare CR with SP in body
-	for (size_t i = 0; i < this->_body.size(); ++i)
-	{
-		if (this->_body[i] == '\r' && (i + 1 == this->_body.size() || this->_body[i + 1] != '\n'))
-			this->_body[i] = ' ';
-	}
-
-	return NO_ERROR;
+	return NO_STATUS_CODE;
 }
 
 const std::string &Request::getRequest() const

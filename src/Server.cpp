@@ -185,12 +185,14 @@ std::string Server::_processRequestResponse(int clientfd)
 {
 	Request request(clientfd, this->_socket.getPort());
 
-	StatusErrorCode error = request.parseRequest();
-	if (error != NO_ERROR)
-		return generateStatusError(error);
-
+	StatusCode statusCode = request.parseRequest();
+	std::cout << request.getRequest() << std::endl;
 	Response response(request.getRequest(), request.getMethod(), request.getRequestedFile(), request.getHeaders(), request.getBody());
-	return response.handleMethods();
+	if (statusCode != NO_STATUS_CODE)
+		return response.handleResponse(statusCode);
+
+	statusCode = response.handleMethods(); // statusCode never is going to be NO_STATUS_CODE, will be an error or success
+	return response.handleResponse(statusCode);
 }
 
 void Server::_sendResponse(int clientfd, const std::string &response)
