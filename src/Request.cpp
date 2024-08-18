@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Request.cpp                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
+/*   By: adgutier <adgutier@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:44:05 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/18 14:00:58 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/18 17:21:02 by adgutier         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -286,13 +286,6 @@ StatusCode Request::_parseBody(size_t &pos, size_t &contentLength)
 	}
 	else if (remainingLength > 0)
 		this->_body = this->_request.substr(pos); // No Content-Length specified, consume the remaining data
-
-	// Replace bare CR with SP in body
-	for (size_t i = 0; i < this->_body.size(); ++i)
-	{
-		if (this->_body[i] == '\r' && (i + 1 == this->_body.size() || this->_body[i + 1] != '\n'))
-			this->_body[i] = ' ';
-	}
 
 	return NO_STATUS_CODE;
 }

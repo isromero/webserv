@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   utils.cpp                                          :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
+/*   By: adgutier <adgutier@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:29:36 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/18 14:22:31 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/18 17:25:27 by adgutier         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
