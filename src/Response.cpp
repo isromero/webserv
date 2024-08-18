@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Response.cpp                                       :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: adgutier <adgutier@student.42madrid.com    +#+  +:+       +#+        */
+/*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/18 17:08:59 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/18 18:23:44 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,7 +30,7 @@ const std::string Response::handleResponse(StatusCode statusCode)
 	{
 	case SUCCESS_200:
 		statusLine = "HTTP/1.1 200 OK";
-		if(this->_method == "GET")
+		if (this->_method == "GET")
 			this->_responseBody = readFile(this->_responseFile);
 		break;
 	case SUCCESS_201:
@@ -280,25 +280,22 @@ StatusCode Response::_handleDELETE()
 	std::string file;
 	if (this->_requestedFile.empty())
 		return ERROR_400;
-	else if (this->_requestHeaders["Content-Length"] != "0") // Body have to be empty
-		return ERROR_400;
+	else if (this->_requestHeaders["Content-Length"].find("Content-Length") != std::string::npos && this->_requestHeaders["Content-Length"] != "0")
+		return ERROR_400;												   // DELETE request should not have a body, if there is present Content-Length header, it should be 0
 	else if (this->_requestedFile[this->_requestedFile.size() - 1] == '/') // If is a directory, we don't allow to delete it
 		return ERROR_403;
 	else
 	{
 		file = "pages" + this->_requestedFile;
 
-		if (remove(file.c_str()) == 0)
+		if (access(file.c_str(), F_OK) != 0) // Check if the file exists
+			return ERROR_404;
+		else if (access(file.c_str(), W_OK) != 0) // Check if the file is writable
+			return ERROR_403;
+		else if (remove(file.c_str()) == 0)
 			return SUCCESS_204;
 		else
-		{
-			if (errno == ENOENT) // File not found
-				return ERROR_404;
-			else if (errno == EACCES) // Permission denied
-				return ERROR_403;
-			else
-				return ERROR_500;
-		}
+			return ERROR_500;
 	}
 
 	return NO_STATUS_CODE; // Impossible to reach this point
