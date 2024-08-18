@@ -17,6 +17,9 @@
 #include <string>
 #include <map>
 #include <unistd.h>
+#include <cstdlib>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include "status.hpp"
 #include "utils.hpp"
@@ -38,6 +41,8 @@ private:
 	StatusCode _handleGET();
 	StatusCode _handlePOST();
 	StatusCode _handleDELETE();
+	void _handleCGI();
+	bool _isCGIRequest(const std::string& requestedFile);
 
 	const std::string _determineContentType(const std::string &filename);
 	const std::string _generateHTMLPage(bool isError, const std::string &statusLine, const std::string &body);

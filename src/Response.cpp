@@ -21,6 +21,102 @@ Response::~Response()
 {
 }
 
+bool Response::_isCGIRequest(const std::string &requestedFile)
+{
+	if (requestedFile.find("/cgi-bin/") != std::string::npos ||
+		requestedFile.find(".cgi") != std::string::npos ||
+		requestedFile.find(".pl") != std::string::npos ||
+		requestedFile.find(".py") != std::string::npos)
+		return true;
+	return false;
+}
+
+StatusCode Response::_handleCGI()
+{
+	int pipefd[2];
+	if (pipe(pipefd) == -1)
+	  return ERROR_500;
+
+	pid_t pid = fork();
+	if (pid == -1)
+	  return ERROR_500;
+	else if (pid == 0) // Proceso hijo (CGI)
+	{
+		close(pipefd[0]); // Cerramos la lectura en el hijo
+
+		// Redirigimos stdout al pipe
+		dup2(pipefd[1], STDOUT_FILENO);
+		close(pipefd[1]);
+
+		// Si el método es POST, redirigir stdin
+		if (this->_method == "POST")
+		{
+			int inputPipe[2];
+			if (pipe(inputPipe) == -1)
+				exit(1); // Error al crear el pipe
+
+			dup2(inputPipe[0], STDIN_FILENO); // Redirigir stdin al extremo de lectura del pipe
+			close(inputPipe[0]);			  // Cerramos la lectura ya que está redirigida
+
+			// Escribir los datos POST al extremo de escritura del pipe
+			ssize_t bytesWritten = write(inputPipe[1], this->_body.c_str(), this->_body.size());
+			if (bytesWritten == -1)
+			{
+				// Manejar el error de la escritura si es necesario
+				perror("Error writing to CGI input pipe");
+				// Podrías salir del proceso hijo si hay un error crítico
+				exit(1);
+			}
+			close(inputPipe[1]); // Cerramos la escritura después de enviar los datos
+		}
+
+		// Configurar las variables de entorno
+		setenv("REQUEST_METHOD", this->_method.c_str(), 1);
+		setenv("SCRIPT_NAME", this->_requestedFile.c_str(), 1);
+		setenv("QUERY_STRING", this->_request.c_str(), 1);
+		setenv("CONTENT_TYPE", _determineContentType(this->_requestedFile).c_str(), 1);
+		setenv("CONTENT_LENGTH", toString(this->_body.size()).c_str(), 1);
+		setenv("GATEWAY_INTERFACE", "CGI/1.1", 1);
+		setenv("SERVER_PROTOCOL", "HTTP/1.1", 1);
+
+		// Ejecutar el CGI
+		std::string scriptPath = "./pages" + this->_requestedFile;
+		char *args[] = {const_cast<char *>(scriptPath.c_str()), NULL};
+		execve(scriptPath.c_str(), args, environ);
+
+		exit(1); // Si execve falla
+	}
+	else // Proceso padre
+	{
+		close(pipefd[1]); // Cerramos la escritura en el padre
+
+		// Leer la salida del CGI desde el pipe
+		char buffer[1024];
+		std::string cgiOutput;
+		ssize_t bytesRead;
+		while ((bytesRead = read(pipefd[0], buffer, sizeof(buffer))) > 0)
+		{
+			cgiOutput.append(buffer, bytesRead);
+		}
+		close(pipefd[0]); // Cerramos la lectura una vez finalizada
+
+		waitpid(pid, NULL, 0); // Esperamos al hijo
+
+		// Si no hay salida del CGI, devolver un error
+		if (cgiOutput.empty())
+		  return ERROR_500;
+		else
+		{
+			// Crear la respuesta HTTP con la salida del CGI
+			this->_response = "HTTP/1.1 200 OK\r\n"
+							  "Content-Type: text/html\r\n"
+							  "Content-Length: " +
+							  toString(cgiOutput.size()) + "\r\n\r\n" +
+							  cgiOutput;
+		}
+	}
+}
+
 const std::string Response::handleResponse(StatusCode statusCode)
 {
 	std::string statusLine;
@@ -132,7 +228,9 @@ const std::string Response::handleResponse(StatusCode statusCode)
 
 StatusCode Response::handleMethods()
 {
-	if (this->_method == "GET")
+  if (_isCGIRequest(this->_requestedFile))
+		return this->_handleCGI();
+	else if (this->_method == "GET")
 		return this->_handleGET();
 	else if (this->_method == "POST")
 		return this->_handlePOST();
@@ -175,7 +273,6 @@ StatusCode Response::_handleGET()
 StatusCode Response::_handlePOST()
 {
 	std::string contentType = this->_requestHeaders["Content-Type"];
-
 	if (contentType.find("multipart/form-data") != std::string::npos) // Handle file uploads
 	{
 		// Boundary is something like "----WebKitFormBoundary7MA4YWxkTrZu0gW" and it is in the Content-Type header
