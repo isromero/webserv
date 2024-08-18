@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:52:54 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/18 13:43:21 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/18 19:28:35 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,6 +24,10 @@
 #include "status.hpp"
 #include "utils.hpp"
 
+#if defined(__APPLE__)
+extern char **environ;
+#endif
+
 class Response
 {
 private:
@@ -38,12 +42,12 @@ private:
 	std::string _responseFile;
 	std::string _locationHeader;
 
+	StatusCode _handleCGI();
 	StatusCode _handleGET();
 	StatusCode _handlePOST();
 	StatusCode _handleDELETE();
-	void _handleCGI();
-	bool _isCGIRequest(const std::string& requestedFile);
 
+	bool _isCGIRequest();
 	const std::string _determineContentType(const std::string &filename);
 	const std::string _generateHTMLPage(bool isError, const std::string &statusLine, const std::string &body);
 
