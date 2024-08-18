@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:29:36 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/17 11:38:34 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/18 14:22:31 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -74,7 +74,7 @@ bool saveFile(const std::string &content, const std::string &filename, std::stri
 	std::ofstream file(filepath.c_str(), std::ios::binary);
 	if (file.is_open())
 	{
-		file.write(content.c_str(), content.length());
+		file.write(content.c_str(), content.size());
 		file.close();
 		savedPath = filepath;
 		return true;

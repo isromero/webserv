@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:52:54 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/17 12:55:19 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/18 13:43:21 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -40,7 +40,7 @@ private:
 	StatusCode _handleDELETE();
 
 	const std::string _determineContentType(const std::string &filename);
-	const std::string _generateHTMLErrorPage(const std::string &statusLine, const std::string &body);
+	const std::string _generateHTMLPage(bool isError, const std::string &statusLine, const std::string &body);
 
 public:
 	Response(const std::string &request, const std::string &method, const std::string &requestedFile, const std::map<std::string, std::string> &headers, const std::string &body);

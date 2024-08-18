@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:44:05 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/17 12:36:49 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/18 14:00:58 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,12 +24,43 @@ void Request::_readRequest(int clientfd)
 	// Just read the data from the client
 	char buffer[1024];
 	ssize_t bytesRead;
+	bool headersRead = false;
+	size_t contentLength = 0;
+	size_t totalBodyRead = 0;
+
 	while ((bytesRead = recv(clientfd, buffer, sizeof(buffer) - 1, 0)) > 0)
 	{
 		buffer[bytesRead] = '\0';
 		this->_request.append(buffer, bytesRead);
-		if (this->_request.find("\r\n\r\n") != std::string::npos)
+
+		if (!headersRead)
+		{
+			size_t pos = this->_request.find("\r\n\r\n");
+			if (pos != std::string::npos)
+			{
+				headersRead = true;
+
+				std::string headers = this->_request.substr(0, pos);
+				size_t contentLengthPos = headers.find("Content-Length: ");
+				if (contentLengthPos != std::string::npos)
+				{
+					contentLengthPos += 16; // "Content-Length: " is 16 characters long
+					size_t endOfLength = headers.find("\r\n", contentLengthPos);
+					if (endOfLength != std::string::npos)
+						contentLength = std::atoi(headers.substr(contentLengthPos, endOfLength - contentLengthPos).c_str()); // Get the content length number
+				}
+				// Calculate the total body read
+				totalBodyRead = this->_request.size() - (pos + 4);
+			}
+		}
+		else
+			totalBodyRead += bytesRead;
+
+		if (headersRead && totalBodyRead >= contentLength)
 			break;
+
+		if (this->_request.size() > 102400) // ! Maximum request size: we can change this value
+			break;							// Request too large, then in parsing we return 400
 	}
 	if (bytesRead == -1)
 	{
@@ -49,7 +80,7 @@ StatusCode Request::parseRequest()
 {
 	if (this->_request.empty())
 		return ERROR_400;
-	else if (this->_request.size() > 8192) // ! Maximum request size:  we can change this value
+	else if (this->_request.size() >= 102400) // ! Maximum request size:  we can change this value
 		return ERROR_400;
 
 	size_t pos = 0;
@@ -246,6 +277,7 @@ StatusCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &contentLengt
 StatusCode Request::_parseBody(size_t &pos, size_t &contentLength)
 {
 	size_t remainingLength = this->_request.size() - pos;
+
 	if (contentLength > 0)
 	{
 		if (remainingLength < contentLength)

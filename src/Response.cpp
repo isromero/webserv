@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/17 13:09:08 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/18 14:15:09 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -102,10 +102,18 @@ const std::string Response::handleResponse(StatusCode statusCode)
 	if (isError)
 	{
 		this->_responseHeaders["Content-Type"] = "text/html"; // Error pages are always html
-		this->_responseBody = this->_generateHTMLErrorPage(statusLine, this->_responseBody);
+		this->_responseBody = this->_generateHTMLPage(isError, statusLine, this->_responseBody);
 	}
-	else
-		this->_responseHeaders["Content-Type"] = this->_determineContentType(this->_responseFile);
+	else if (!isError)
+	{
+		if (statusCode == SUCCESS_200) // If it is a success, we determine the content type because we are serving a file
+			this->_responseHeaders["Content-Type"] = this->_determineContentType(this->_responseFile);
+		else
+		{
+			this->_responseHeaders["Content-Type"] = "text/html"; // Other sucess messages we return an HTML page
+			this->_responseBody = this->_generateHTMLPage(isError, statusLine, this->_responseBody);
+		}
+	}
 
 	this->_responseHeaders["Content-Length"] = toString(this->_responseBody.size());
 
@@ -216,18 +224,11 @@ StatusCode Response::_handlePOST()
 
 		return fileUploaded ? SUCCESS_201 : SUCCESS_200;
 	}
-	else if (contentType.find("application/json") != std::string::npos) // JSON data
-	{
-		if (this->_requestBody.size() >= 2 && this->_requestBody[0] == '{' && this->_requestBody[this->_requestBody.size() - 1] == '}')
-			return SUCCESS_200; // JSON is valid, but we don't do anything with it(not saving in the server)
-		else
-			return ERROR_400;
-	}
 	else if (contentType.find("application/x-www-form-urlencoded") != std::string::npos) // Form data, this is the typical "key=value" format
 	{
 		// Check for valid key=value pairs
 		size_t pos = 0;
-		while (pos < this->_requestBody.length())
+		while (pos < this->_requestBody.size())
 		{
 			size_t eqPos = this->_requestBody.find('=', pos);
 			if (eqPos == std::string::npos || eqPos == pos)
@@ -235,7 +236,7 @@ StatusCode Response::_handlePOST()
 
 			size_t ampPos = this->_requestBody.find('&', eqPos);
 			if (ampPos == std::string::npos)
-				ampPos = this->_requestBody.length();
+				ampPos = this->_requestBody.size();
 
 			if (ampPos <= eqPos + 1)
 				return ERROR_400;
@@ -243,6 +244,14 @@ StatusCode Response::_handlePOST()
 			pos = ampPos + 1;
 		}
 		return SUCCESS_200; // Valid but we don't do anything with it(not saving in the server)
+	}
+	else if (contentType.find("application/json") != std::string::npos) // JSON data
+	{
+
+		if (this->_requestBody.size() >= 2 && this->_requestBody[0] == '{' && this->_requestBody[this->_requestBody.size() - 1] == '}')
+			return SUCCESS_200; // JSON is valid, but we don't do anything with it(not saving in the server)
+		else
+			return ERROR_400;
 	}
 	else if (contentType.find("text/html") != std::string::npos)
 	{
@@ -355,7 +364,7 @@ const std::string Response::_determineContentType(const std::string &filename)
 		return "application/octet-stream"; // Default binary file type
 }
 
-const std::string Response::_generateHTMLErrorPage(const std::string &statusLine, const std::string &body)
+const std::string Response::_generateHTMLPage(bool isError, const std::string &statusLine, const std::string &body)
 {
 	std::string responseBody;
 	std::string status;
@@ -370,7 +379,10 @@ const std::string Response::_generateHTMLErrorPage(const std::string &statusLine
 	responseBody += "<title>" + status + "</title>\n"; // Remove "HTTP/1.1 "
 	responseBody += "<style>\n";
 	responseBody += "body { text-align: center; margin-top: 50px; }\n";
-	responseBody += "h1 { font-size: 50px; color: red; }\n";
+	if (isError)
+		responseBody += "h1 { font-size: 50px; color: red; }\n";
+	else
+		responseBody += "h1 { font-size: 50px; color: green; }\n";
 	responseBody += "p { font-size: 20px; }\n";
 	responseBody += "</style>\n";
 	responseBody += "</head>\n";
