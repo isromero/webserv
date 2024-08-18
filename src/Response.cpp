@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/18 14:15:09 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/18 17:08:59 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -120,7 +120,6 @@ const std::string Response::handleResponse(StatusCode statusCode)
 	if (this->_locationHeader != "")
 		this->_responseHeaders["Location"] = this->_locationHeader;
 
-	// TODO: Create function to create error pages with html???
 	this->_response = statusLine + "\r\n";
 	for (std::map<std::string, std::string>::iterator it = this->_responseHeaders.begin(); it != this->_responseHeaders.end(); ++it)
 		this->_response += it->first + ": " + it->second + "\r\n"; // Add all headers to response
