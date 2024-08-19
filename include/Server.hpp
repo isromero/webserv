@@ -37,17 +37,20 @@
 #include "Socket.hpp"
 #include "Request.hpp"
 #include "Response.hpp"
+#include "ServerConfig.hpp"
 
 class Server
 {
 private:
 	Socket _socket;
+	ServerConfig _config;
 
 	int _acceptClient();
 	std::string _processRequestResponse(int clientfd);
 	void _sendResponse(int clientfd, const std::string &response);
 
 public:
+	Server(const std::string &configFilePath);
 	Server(int port);
 	Server(const Server &other);
 	Server &operator=(const Server &other);

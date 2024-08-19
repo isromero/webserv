@@ -12,17 +12,23 @@
 
 #include "Server.hpp"
 
-int main(int argc, char **argv)
-{
-	(void)argc;
-	(void)argv;
-	Server server(6969);
+int main(int argc, char **argv) {
+	if (argc != 2) {
+		std::cerr << "Usage: " << argv[0] << " <config_file>" << std::endl;
+		return 1;
+	}
 
-#if defined(__linux__)
-	server.runLinux();
-#elif defined(__APPLE__)
-	server.runMac();
-#endif
+	try {
+		Server server(argv[1]);  // Cargar configuración desde el archivo
+		#if defined(__linux__)
+			server.runLinux();
+		#elif defined(__APPLE__)
+			server.runMac();
+		#endif
+	} catch (const std::exception &e) {
+		std::cerr << e.what() << std::endl;
+		return 1;
+	}
 
 	return 0;
 }

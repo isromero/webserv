@@ -20,7 +20,7 @@ RM = rm -f
 SRCSDIR = src
 OBJSDIR = objs
 
-SRCS = main.cpp Server.cpp Socket.cpp Request.cpp Response.cpp utils.cpp
+SRCS = main.cpp Server.cpp Socket.cpp Request.cpp Response.cpp utils.cpp ServerConfig.cpp
 OBJS = $(addprefix $(OBJSDIR)/, $(SRCS:.cpp=.o))
 
 # Colors

@@ -12,17 +12,19 @@
 
 #include "Server.hpp"
 
-Server::Server(int port) : _socket(port)
-{
-	try
-	{
-		this->_socket.init();
-	}
-	catch (const std::exception &e)
-	{
-		std::cerr << "Error initializing server: " << e.what() << std::endl;
-		exit(EXIT_FAILURE);
-	}
+Server::Server(const std::string &configFilePath) : _socket(0), _config() {
+    try {
+        // Cargar la configuración
+        parseConfigFile(configFilePath, _config);
+
+        // Configurar el socket con el puerto de la configuración
+        _socket = Socket(_config.getPort()); // Crear el socket con el puerto de configuración
+        _socket.init(); // Inicializar el socket con la configuración
+
+    } catch (const std::exception &e) {
+        std::cerr << "Error initializing server: " << e.what() << std::endl;
+        exit(EXIT_FAILURE);
+    }
 }
 
 Server::Server(const Server &other) : _socket(other._socket) {}
