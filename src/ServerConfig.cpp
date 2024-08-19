@@ -14,6 +14,8 @@
 
 #include "ServerConfig.hpp"
 
+
+//TODO IMPLEMENTAR TODA ESTA INFORMACION PARSEADA EN EL CODIGO
 int ServerConfig::getPort() const { return _port; }
 std::string ServerConfig::getHost() const { return _host; }
 std::string ServerConfig::getServerName() const { return _serverName; }
