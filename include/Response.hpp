@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:52:54 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/18 19:28:35 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/19 19:22:25 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -41,6 +41,8 @@ private:
 	std::string _responseBody;
 	std::string _responseFile;
 	std::string _locationHeader;
+	std::map<std::string, std::string> _cgiHeaders;
+	std::string _cgiBody;
 
 	StatusCode _handleCGI();
 	StatusCode _handleGET();

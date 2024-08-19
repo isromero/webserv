@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/18 19:40:43 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/19 19:35:28 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -97,33 +97,63 @@ const std::string Response::handleResponse(StatusCode statusCode)
 		break;
 	}
 
-	// Build the response
-
-	// if isError is true, the content type will be text/html because we return an error message
-	if (isError)
+	if (!this->_isCGIRequest)
 	{
-		this->_responseHeaders["Content-Type"] = "text/html"; // Error pages are always html
-		this->_responseBody = this->_generateHTMLPage(isError, statusLine, this->_responseBody);
-	}
-	else if (!isError)
-	{
-		if (statusCode == SUCCESS_200 && this->_method == "GET") // If it is a success, we determine the content type because we are serving a file
-			this->_responseHeaders["Content-Type"] = this->_determineContentType(this->_responseFile);
-		else
+		// Build the headers and body for not cgi requests
+		// if isError is true, the content type will be text/html because we return an error message
+		if (isError)
 		{
-			this->_responseHeaders["Content-Type"] = "text/html"; // Other sucess messages we return an HTML page
+			this->_responseHeaders["Content-Type"] = "text/html"; // Error pages are always html
 			this->_responseBody = this->_generateHTMLPage(isError, statusLine, this->_responseBody);
 		}
+		else if (!isError)
+		{
+			if (statusCode == SUCCESS_200 && this->_method == "GET") // If it is a success, we determine the content type because we are serving a file
+				this->_responseHeaders["Content-Type"] = this->_determineContentType(this->_responseFile);
+			else
+			{
+				this->_responseHeaders["Content-Type"] = "text/html"; // Other sucess messages we return an HTML page
+				this->_responseBody = this->_generateHTMLPage(isError, statusLine, this->_responseBody);
+			}
+		}
+		if (this->_locationHeader != "")
+			this->_responseHeaders["Location"] = this->_locationHeader;
+		this->_responseHeaders["Content-Length"] = toString(this->_responseBody.size());
 	}
+	else if (this->_isCGIRequest) // TODO gestionar los ERRORES 500 de CGI al igual que el anterior if
+	{
+		// Build the headers if CGI returned any
+		size_t headerEnd = this->_cgiBody.find("\r\n\r\n");
+		if (headerEnd != std::string::npos)
+		{
+			std::string headers = this->_cgiBody.substr(0, headerEnd);
+			this->_responseBody = this->_cgiBody.substr(headerEnd + 4);
 
-	this->_responseHeaders["Content-Length"] = toString(this->_responseBody.size());
+			std::istringstream headerStream(headers);
+			std::string header;
+			while (std::getline(headerStream, header) && !header.empty())
+			{
+				size_t colonPos = header.find(':');
+				if (colonPos != std::string::npos)
+				{
+					std::string key = header.substr(0, colonPos);
+					std::string value = header.substr(colonPos + 1);
+					trim(key);
+					trim(value);
+					this->_responseHeaders[key] = value;
+				}
+			}
+		}
+		else // If there are no headers, we just return the body of the CGI
+			this->_responseBody = this->_cgiBody;
 
-	if (this->_locationHeader != "")
-		this->_responseHeaders["Location"] = this->_locationHeader;
+		if (this->_responseHeaders.find("Content-Length") == this->_responseHeaders.end()) // If there is no content length, we add it
+			this->_responseHeaders["Content-Length"] = toString(this->_responseBody.size());
+	}
 
 	this->_response = statusLine + "\r\n";
 	for (std::map<std::string, std::string>::iterator it = this->_responseHeaders.begin(); it != this->_responseHeaders.end(); ++it)
-		this->_response += it->first + ": " + it->second + "\r\n"; // Add all headers to response
+		this->_response += it->first + ": " + it->second + "\r\n";
 	this->_response += "\r\n";
 	this->_response += this->_responseBody;
 
@@ -171,8 +201,6 @@ StatusCode Response::_handleCGI()
 		dup2(pipefd[1], STDOUT_FILENO);
 		close(pipefd[1]);
 
-		// TODO manage the get
-
 		// Si el método es POST, redirigir stdin
 		if (this->_method == "POST")
 		{
@@ -203,11 +231,11 @@ StatusCode Response::_handleCGI()
 		setenv("CONTENT_LENGTH", toString(this->_requestBody.size()).c_str(), 1);
 		setenv("GATEWAY_INTERFACE", "CGI/1.1", 1);
 		setenv("SERVER_PROTOCOL", "HTTP/1.1", 1);
-
-		// Ejecutar el CGI
 		std::string scriptPath = "./pages" + this->_requestedFile;
+		setenv("PATH_INFO", scriptPath.c_str(), 1);
+
 		char *args[] = {const_cast<char *>(scriptPath.c_str()), NULL};
-		execve(scriptPath.c_str(), args, environ);
+		execve(getenv("PATH_INFO"), args, environ);
 
 		exit(1); // Si execve falla
 	}
@@ -219,13 +247,14 @@ StatusCode Response::_handleCGI()
 		char buffer[1024];
 		ssize_t bytesRead;
 		while ((bytesRead = read(pipefd[0], buffer, sizeof(buffer))) > 0)
-			this->_responseBody.append(buffer, bytesRead);
+			this->_cgiBody.append(buffer, bytesRead);
+
 		close(pipefd[0]); // Cerramos la lectura una vez finalizada
 
 		waitpid(pid, NULL, 0); // Esperamos al hijo
 
 		// If the CGI script didn't return anything, return a 500 error
-		if (this->_responseBody.empty())
+		if (this->_cgiBody.empty())
 			return ERROR_500;
 		else
 			return SUCCESS_200;
