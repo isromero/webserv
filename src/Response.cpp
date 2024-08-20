@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/20 18:11:27 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/20 19:06:23 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -97,30 +97,7 @@ const std::string Response::handleResponse(StatusCode statusCode)
 		break;
 	}
 
-	if (!this->_isCGIRequest())
-	{
-		// Build the headers and body for not cgi requests
-		// if isError is true, the content type will be text/html because we return an error message
-		if (isError)
-		{
-			this->_responseHeaders["Content-Type"] = "text/html"; // Error pages are always html
-			this->_responseBody = this->_generateHTMLPage(isError, statusLine, this->_responseBody);
-		}
-		else if (!isError)
-		{
-			if (statusCode == SUCCESS_200 && this->_method == "GET") // If it is a success, we determine the content type because we are serving a file
-				this->_responseHeaders["Content-Type"] = this->_determineContentType(this->_responseFile);
-			else
-			{
-				this->_responseHeaders["Content-Type"] = "text/html"; // Other sucess messages we return an HTML page
-				this->_responseBody = this->_generateHTMLPage(isError, statusLine, this->_responseBody);
-			}
-		}
-		if (this->_locationHeader != "")
-			this->_responseHeaders["Location"] = this->_locationHeader;
-		this->_responseHeaders["Content-Length"] = toString(this->_responseBody.size());
-	}
-	else if (this->_isCGIRequest()) // TODO gestionar los ERRORES 500 de CGI al igual que el anterior if
+	if (this->_isCGIRequest())
 	{
 		// Build the headers if CGI returned any
 		size_t headerEnd = this->_cgiBody.find("\r\n\r\n");
@@ -155,12 +132,30 @@ const std::string Response::handleResponse(StatusCode statusCode)
 			size_t contentLength = static_cast<size_t>(std::atoi(contentLengthIt->second.c_str()));
 			if (contentLength < this->_responseBody.size()) // If the content length is less than the body, we truncate it
 				this->_responseBody = this->_responseBody.substr(0, contentLength);
-			else if (contentLength > this->_responseBody.size())
-				this->_responseHeaders["Content-Length"] = toString(this->_responseBody.size()); // If the content length is greater than the body, we adjust it
 		}
-		else // If the CGI script didn't return a Content-Length header, we add it getting the size of the body
-			this->_responseHeaders["Content-Length"] = toString(this->_responseBody.size());
 	}
+
+	// Build the location header (We just inform to the client, but we don't use redirects, just 201 created)
+	if (this->_locationHeader != "")
+		this->_responseHeaders["Location"] = this->_locationHeader;
+
+	if (isError)
+	{
+		this->_responseHeaders["Content-Type"] = "text/html"; // Error pages are always html
+		this->_responseBody = this->_generateHTMLPage(isError, statusLine, this->_responseBody);
+	}
+	else if (!isError && !this->_isCGIRequest())
+	{
+		if ((statusCode == SUCCESS_200 && this->_method == "GET")) // If it is a success, we determine the content type because we are serving a file
+			this->_responseHeaders["Content-Type"] = this->_determineContentType(this->_responseFile);
+		else
+		{
+			this->_responseHeaders["Content-Type"] = "text/html"; // Other sucess messages we return an HTML page
+			this->_responseBody = this->_generateHTMLPage(isError, statusLine, this->_responseBody);
+		}
+	}
+
+	this->_responseHeaders["Content-Length"] = toString(this->_responseBody.size()); // Always add the content length after the body is generated(truncated, changed...)
 
 	this->_response = statusLine + "\r\n";
 	for (std::map<std::string, std::string>::iterator it = this->_responseHeaders.begin(); it != this->_responseHeaders.end(); ++it)
@@ -186,7 +181,6 @@ StatusCode Response::handleMethods()
 
 bool Response::_isCGIRequest()
 {
-	// TODO: Add more extensions
 	if (this->_requestedFile.find("/cgi-bin/") != std::string::npos ||
 		this->_requestedFile.find(".cgi") != std::string::npos ||
 		this->_requestedFile.find(".pl") != std::string::npos ||
@@ -204,37 +198,46 @@ StatusCode Response::_handleCGI()
 	pid_t pid = fork();
 	if (pid == -1)
 		return ERROR_500;
-	else if (pid == 0) // Proceso hijo (CGI)
+	else if (pid == 0)
 	{
-		close(pipefd[0]); // Cerramos la lectura en el hijo
+		close(pipefd[0]); // Close reading in the child
 
-		// Redirigimos stdout al pipe
-		dup2(pipefd[1], STDOUT_FILENO);
+		// Redirect stdout to the pipe
+		if (dup2(pipefd[1], STDOUT_FILENO) == -1)
+		{
+			std::cerr << "Error: duplicating file descriptor for stdout: " << strerror(errno) << std::endl;
+			exit(1);
+		}
 		close(pipefd[1]);
 
-		// Si el método es POST, redirigir stdin
+		// If it is a POST request, we need to redirect stdin to the pipe because the CGI script will read from it
 		if (this->_method == "POST")
 		{
 			int inputPipe[2];
 			if (pipe(inputPipe) == -1)
-				exit(1); // Error al crear el pipe
+			{
+				std::cerr << "Error: creating the input pipe: " << strerror(errno) << std::endl;
+				exit(1);
+			}
 
-			dup2(inputPipe[0], STDIN_FILENO); // Redirigir stdin al extremo de lectura del pipe
-			close(inputPipe[0]);			  // Cerramos la lectura ya que está redirigida
+			if (dup2(inputPipe[0], STDIN_FILENO) == -1)
+			{
+				std::cerr << "Error: duplicating file descriptor for stdin: " << strerror(errno) << std::endl;
+				exit(1);
+			}
+			close(inputPipe[0]); // Close the reading end of the pipe
 
-			// Escribir los datos POST al extremo de escritura del pipe
+			// Write the body to the pipe
 			ssize_t bytesWritten = write(inputPipe[1], this->_requestBody.c_str(), this->_requestBody.size());
 			if (bytesWritten == -1)
 			{
-				// Manejar el error de la escritura si es necesario
-				perror("Error writing to CGI input pipe");
-				// Podrías salir del proceso hijo si hay un error crítico
+				std::cerr << "Error: writing to the pipe: " << strerror(errno) << std::endl;
 				exit(1);
 			}
-			close(inputPipe[1]); // Cerramos la escritura después de enviar los datos
+			close(inputPipe[1]); // Close the writing end of the pipe
 		}
 
-		// Configurar las variables de entorno
+		// CGIs need to have some environment variables set
 		setenv("REQUEST_METHOD", this->_method.c_str(), 1);
 		setenv("SCRIPT_NAME", this->_requestedFile.c_str(), 1);
 		setenv("QUERY_STRING", this->_request.c_str(), 1);
@@ -248,21 +251,39 @@ StatusCode Response::_handleCGI()
 		char *args[] = {const_cast<char *>(scriptPath.c_str()), NULL};
 		execve(getenv("PATH_INFO"), args, environ);
 
-		exit(1); // Si execve falla
+		std::cerr << "Error: executing CGI script: " << strerror(errno) << std::endl;
+		exit(1); // If execve fails
 	}
-	else // Proceso padre
+	else
 	{
-		close(pipefd[1]); // Cerramos la escritura en el padre
+		close(pipefd[1]); // Close writing in the parent
 
-		// Leer la salida del CGI desde el pipe
+		// Read the output from the pipe
 		char buffer[1024];
 		ssize_t bytesRead;
 		while ((bytesRead = read(pipefd[0], buffer, sizeof(buffer))) > 0)
 			this->_cgiBody.append(buffer, bytesRead);
 
-		close(pipefd[0]); // Cerramos la lectura una vez finalizada
+		close(pipefd[0]); // Close reading in the parent
 
-		waitpid(pid, NULL, 0); // Esperamos al hijo
+		int status;
+		if (waitpid(pid, &status, 0) == -1)
+		{
+			std::cerr << "Error: waiting for CGI process: " << strerror(errno) << std::endl;
+			return ERROR_500;
+		}
+
+		if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
+		{
+			std::cerr << "Error: CGI script exited with status " << WEXITSTATUS(status) << std::endl;
+			return ERROR_500;
+		}
+
+		if (WIFSIGNALED(status))
+		{
+			std::cerr << "Error: CGI script was terminated by signal " << WTERMSIG(status) << std::endl;
+			return ERROR_500;
+		}
 
 		// If the CGI script didn't return anything, return a 500 error
 		if (this->_cgiBody.empty())
@@ -290,17 +311,11 @@ StatusCode Response::_handleGET()
 	if (this->_responseFile.find_last_of(".") == std::string::npos)
 		this->_responseFile += ".html";
 
-	// Check if the file exists
-	if (access(this->_responseFile.c_str(), F_OK) != 0)
-		return ERROR_404;
+	// Check if the file is readable
+	if (access(this->_responseFile.c_str(), R_OK) != 0)
+		return ERROR_403;
 	else
-	{
-		// Check if the file is readable
-		if (access(this->_responseFile.c_str(), R_OK) != 0)
-			return ERROR_403;
-		else
-			return SUCCESS_200;
-	}
+		return SUCCESS_200;
 
 	return NO_STATUS_CODE; // Impossible to reach this point
 }
@@ -419,10 +434,7 @@ StatusCode Response::_handleDELETE()
 	else
 	{
 		file = "pages" + this->_requestedFile;
-
-		if (access(file.c_str(), F_OK) != 0) // Check if the file exists
-			return ERROR_404;
-		else if (access(file.c_str(), W_OK) != 0) // Check if the file is writable
+		if (access(file.c_str(), W_OK) != 0) // Check if the file is writable
 			return ERROR_403;
 		else if (remove(file.c_str()) == 0)
 			return SUCCESS_204;

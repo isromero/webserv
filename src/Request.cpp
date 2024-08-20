@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:44:05 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/18 19:44:22 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/20 18:52:16 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -157,6 +157,11 @@ StatusCode Request::_parseRequestLine(size_t &pos, size_t &end)
 		if (this->_requestedFile.find(' ') != std::string::npos || this->_requestedFile.empty())
 			return ERROR_400;
 		this->_requestedFile = secureFilePath(this->_requestedFile);
+
+		// Check if the requested file exists
+		std::string file = "pages" + this->_requestedFile;
+		if (access(file.c_str(), F_OK) == -1)
+			return ERROR_404;
 	}
 	else if (requestLine.find("HTTP/1.1") == std::string::npos)
 		return ERROR_505;
