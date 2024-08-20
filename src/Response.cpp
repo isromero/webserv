@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/19 19:35:28 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/20 18:11:27 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -97,7 +97,7 @@ const std::string Response::handleResponse(StatusCode statusCode)
 		break;
 	}
 
-	if (!this->_isCGIRequest)
+	if (!this->_isCGIRequest())
 	{
 		// Build the headers and body for not cgi requests
 		// if isError is true, the content type will be text/html because we return an error message
@@ -120,14 +120,16 @@ const std::string Response::handleResponse(StatusCode statusCode)
 			this->_responseHeaders["Location"] = this->_locationHeader;
 		this->_responseHeaders["Content-Length"] = toString(this->_responseBody.size());
 	}
-	else if (this->_isCGIRequest) // TODO gestionar los ERRORES 500 de CGI al igual que el anterior if
+	else if (this->_isCGIRequest()) // TODO gestionar los ERRORES 500 de CGI al igual que el anterior if
 	{
 		// Build the headers if CGI returned any
 		size_t headerEnd = this->_cgiBody.find("\r\n\r\n");
+		if (headerEnd == std::string::npos)
+			headerEnd = this->_cgiBody.find("\n\n"); // Maybe the CGI script uses \n instead of \r\n
 		if (headerEnd != std::string::npos)
 		{
 			std::string headers = this->_cgiBody.substr(0, headerEnd);
-			this->_responseBody = this->_cgiBody.substr(headerEnd + 4);
+			this->_responseBody = this->_cgiBody.substr(headerEnd + (this->_cgiBody[headerEnd + 1] == '\n' ? 2 : 1));
 
 			std::istringstream headerStream(headers);
 			std::string header;
@@ -147,7 +149,16 @@ const std::string Response::handleResponse(StatusCode statusCode)
 		else // If there are no headers, we just return the body of the CGI
 			this->_responseBody = this->_cgiBody;
 
-		if (this->_responseHeaders.find("Content-Length") == this->_responseHeaders.end()) // If there is no content length, we add it
+		std::map<std::string, std::string>::iterator contentLengthIt = this->_responseHeaders.find("Content-Length");
+		if (contentLengthIt != this->_responseHeaders.end()) // Check if the CGI script returned a Content-Length header
+		{
+			size_t contentLength = static_cast<size_t>(std::atoi(contentLengthIt->second.c_str()));
+			if (contentLength < this->_responseBody.size()) // If the content length is less than the body, we truncate it
+				this->_responseBody = this->_responseBody.substr(0, contentLength);
+			else if (contentLength > this->_responseBody.size())
+				this->_responseHeaders["Content-Length"] = toString(this->_responseBody.size()); // If the content length is greater than the body, we adjust it
+		}
+		else // If the CGI script didn't return a Content-Length header, we add it getting the size of the body
 			this->_responseHeaders["Content-Length"] = toString(this->_responseBody.size());
 	}
 
