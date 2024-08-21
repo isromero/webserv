@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/20 19:06:23 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/21 21:44:11 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -179,12 +179,9 @@ StatusCode Response::handleMethods()
 	return NO_STATUS_CODE; // Impossible to reach this point
 }
 
-bool Response::_isCGIRequest()
+bool Response::_isCGIRequest() const
 {
-	if (this->_requestedFile.find("/cgi-bin/") != std::string::npos ||
-		this->_requestedFile.find(".cgi") != std::string::npos ||
-		this->_requestedFile.find(".pl") != std::string::npos ||
-		this->_requestedFile.find(".py") != std::string::npos)
+	if (this->_requestedFile.substr(0, 9) == "/cgi-bin/") // This means that the requested file is a CGI script because starts with /cgi-bin/
 		return true;
 	return false;
 }
@@ -240,16 +237,43 @@ StatusCode Response::_handleCGI()
 		// CGIs need to have some environment variables set
 		setenv("REQUEST_METHOD", this->_method.c_str(), 1);
 		setenv("SCRIPT_NAME", this->_requestedFile.c_str(), 1);
-		setenv("QUERY_STRING", this->_request.c_str(), 1);
 		setenv("CONTENT_TYPE", _determineContentType(this->_requestedFile).c_str(), 1);
 		setenv("CONTENT_LENGTH", toString(this->_requestBody.size()).c_str(), 1);
 		setenv("GATEWAY_INTERFACE", "CGI/1.1", 1);
 		setenv("SERVER_PROTOCOL", "HTTP/1.1", 1);
-		std::string scriptPath = "./pages" + this->_requestedFile;
-		setenv("PATH_INFO", scriptPath.c_str(), 1);
+		std::string scriptName = this->_requestedFile;
+		std::string pathInfo = "";
+		std::string queryString = "";
+
+		// Check if there is a query string (?key=value&key2=value2)
+		size_t queryPos = scriptName.find('?');
+		if (queryPos != std::string::npos) // There is a query string
+		{
+			queryString = scriptName.substr(queryPos + 1);
+			scriptName = scriptName.substr(0, queryPos);
+		}
+
+		// Get the path info (the part of the URL after the script name and before the query string: /cgi-bin/script.cgi/path/info)
+		size_t scriptEnd = scriptName.find('/', 9); // 9 = /cgi-bin/ length
+		if (scriptEnd != std::string::npos)			// There is a path info
+		{
+			pathInfo = scriptName.substr(scriptEnd);
+			scriptName = scriptName.substr(0, scriptEnd);
+		}
+
+		std::string scriptPath = "./pages" + scriptName;
+
+		if (access(scriptPath.c_str(), X_OK) != 0) // Check if the script is executable
+			exit(2);
+		else if (access(scriptPath.c_str(), F_OK) != 0) // Check if the script exists
+			exit(3);
+
+		setenv("SCRIPT_NAME", scriptName.c_str(), 1);
+		setenv("PATH_INFO", pathInfo.c_str(), 1);
+		setenv("QUERY_STRING", queryString.c_str(), 1);
 
 		char *args[] = {const_cast<char *>(scriptPath.c_str()), NULL};
-		execve(getenv("PATH_INFO"), args, environ);
+		execve(scriptPath.c_str(), args, environ);
 
 		std::cerr << "Error: executing CGI script: " << strerror(errno) << std::endl;
 		exit(1); // If execve fails
@@ -268,22 +292,21 @@ StatusCode Response::_handleCGI()
 
 		int status;
 		if (waitpid(pid, &status, 0) == -1)
-		{
-			std::cerr << "Error: waiting for CGI process: " << strerror(errno) << std::endl;
 			return ERROR_500;
-		}
 
-		if (WIFEXITED(status) && WEXITSTATUS(status) != 0)
+		if (WIFEXITED(status))
 		{
-			std::cerr << "Error: CGI script exited with status " << WEXITSTATUS(status) << std::endl;
-			return ERROR_500;
+			int status = WEXITSTATUS(status);
+			if (status == 2) // CGI script is not executable
+				return ERROR_403;
+			else if (status == 3) // CGI script does not exist
+				return ERROR_404;
+			else if (status == 1) // Error executing the CGI script
+				return ERROR_500;
 		}
 
 		if (WIFSIGNALED(status))
-		{
-			std::cerr << "Error: CGI script was terminated by signal " << WTERMSIG(status) << std::endl;
 			return ERROR_500;
-		}
 
 		// If the CGI script didn't return anything, return a 500 error
 		if (this->_cgiBody.empty())
@@ -311,9 +334,10 @@ StatusCode Response::_handleGET()
 	if (this->_responseFile.find_last_of(".") == std::string::npos)
 		this->_responseFile += ".html";
 
-	// Check if the file is readable
-	if (access(this->_responseFile.c_str(), R_OK) != 0)
+	if (access(this->_responseFile.c_str(), R_OK) != 0) // Check if the file is readable
 		return ERROR_403;
+	else if (access(this->_responseFile.c_str(), F_OK) != 0) // Check if the file exists
+		return ERROR_404;
 	else
 		return SUCCESS_200;
 
@@ -436,6 +460,8 @@ StatusCode Response::_handleDELETE()
 		file = "pages" + this->_requestedFile;
 		if (access(file.c_str(), W_OK) != 0) // Check if the file is writable
 			return ERROR_403;
+		else if (access(file.c_str(), F_OK) != 0) // Check if the file exists
+			return ERROR_404;
 		else if (remove(file.c_str()) == 0)
 			return SUCCESS_204;
 		else
@@ -445,7 +471,7 @@ StatusCode Response::_handleDELETE()
 	return NO_STATUS_CODE; // Impossible to reach this point
 }
 
-const std::string Response::_determineContentType(const std::string &filename)
+const std::string Response::_determineContentType(const std::string &filename) const
 {
 	if (filename.find(".html") != std::string::npos || filename.find(".htm") != std::string::npos)
 		return "text/html";

@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:52:54 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/20 17:44:05 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/21 21:42:59 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -49,8 +49,8 @@ private:
 	StatusCode _handlePOST();
 	StatusCode _handleDELETE();
 
-	bool _isCGIRequest();
-	const std::string _determineContentType(const std::string &filename);
+	bool _isCGIRequest() const;
+	const std::string _determineContentType(const std::string &filename) const;
 	const std::string _generateHTMLPage(bool isError, const std::string &statusLine, const std::string &body);
 
 public:
