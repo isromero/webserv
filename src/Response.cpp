@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/21 21:44:11 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/21 22:04:04 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -232,13 +232,14 @@ StatusCode Response::_handleCGI()
 				exit(1);
 			}
 			close(inputPipe[1]); // Close the writing end of the pipe
+
+			setenv("CONTENT_LENGTH", toString(this->_requestBody.size()).c_str(), 1); // Not necessary in GET requests
 		}
 
 		// CGIs need to have some environment variables set
 		setenv("REQUEST_METHOD", this->_method.c_str(), 1);
 		setenv("SCRIPT_NAME", this->_requestedFile.c_str(), 1);
 		setenv("CONTENT_TYPE", _determineContentType(this->_requestedFile).c_str(), 1);
-		setenv("CONTENT_LENGTH", toString(this->_requestBody.size()).c_str(), 1);
 		setenv("GATEWAY_INTERFACE", "CGI/1.1", 1);
 		setenv("SERVER_PROTOCOL", "HTTP/1.1", 1);
 		std::string scriptName = this->_requestedFile;
@@ -263,9 +264,9 @@ StatusCode Response::_handleCGI()
 
 		std::string scriptPath = "./pages" + scriptName;
 
-		if (access(scriptPath.c_str(), X_OK) != 0) // Check if the script is executable
+		if (access(scriptPath.c_str(), F_OK) != 0) // Check if the CGI script exists
 			exit(2);
-		else if (access(scriptPath.c_str(), F_OK) != 0) // Check if the script exists
+		else if (access(scriptPath.c_str(), X_OK) != 0) // Check if the CGI script is executable
 			exit(3);
 
 		setenv("SCRIPT_NAME", scriptName.c_str(), 1);
@@ -296,12 +297,12 @@ StatusCode Response::_handleCGI()
 
 		if (WIFEXITED(status))
 		{
-			int status = WEXITSTATUS(status);
-			if (status == 2) // CGI script is not executable
-				return ERROR_403;
-			else if (status == 3) // CGI script does not exist
+			int exitStatus = WEXITSTATUS(status);
+			if (exitStatus == 2) // CGI script does not exist
 				return ERROR_404;
-			else if (status == 1) // Error executing the CGI script
+			else if (exitStatus == 3) // CGI script is not executable
+				return ERROR_403;
+			else if (exitStatus == 1) // Error executing the CGI script
 				return ERROR_500;
 		}
 
