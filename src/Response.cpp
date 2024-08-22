@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/21 22:04:04 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/21 22:08:43 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -236,12 +236,6 @@ StatusCode Response::_handleCGI()
 			setenv("CONTENT_LENGTH", toString(this->_requestBody.size()).c_str(), 1); // Not necessary in GET requests
 		}
 
-		// CGIs need to have some environment variables set
-		setenv("REQUEST_METHOD", this->_method.c_str(), 1);
-		setenv("SCRIPT_NAME", this->_requestedFile.c_str(), 1);
-		setenv("CONTENT_TYPE", _determineContentType(this->_requestedFile).c_str(), 1);
-		setenv("GATEWAY_INTERFACE", "CGI/1.1", 1);
-		setenv("SERVER_PROTOCOL", "HTTP/1.1", 1);
 		std::string scriptName = this->_requestedFile;
 		std::string pathInfo = "";
 		std::string queryString = "";
@@ -269,6 +263,12 @@ StatusCode Response::_handleCGI()
 		else if (access(scriptPath.c_str(), X_OK) != 0) // Check if the CGI script is executable
 			exit(3);
 
+		// CGIs need to have some environment variables set
+		setenv("REQUEST_METHOD", this->_method.c_str(), 1);
+		setenv("SCRIPT_NAME", this->_requestedFile.c_str(), 1);
+		setenv("CONTENT_TYPE", _determineContentType(scriptPath).c_str(), 1);
+		setenv("GATEWAY_INTERFACE", "CGI/1.1", 1);
+		setenv("SERVER_PROTOCOL", "HTTP/1.1", 1);
 		setenv("SCRIPT_NAME", scriptName.c_str(), 1);
 		setenv("PATH_INFO", pathInfo.c_str(), 1);
 		setenv("QUERY_STRING", queryString.c_str(), 1);

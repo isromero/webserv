@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:42:12 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/18 13:45:05 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/22 16:42:44 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -33,6 +33,7 @@ private:
 	std::string _requestedFile;
 	std::map<std::string, std::string> _headers;
 	std::string _body;
+	bool _isChunked;
 	int _serverPort; // TODO: Change this when we have the config file for saving all in one class???
 
 	void _readRequest(int clientfd);

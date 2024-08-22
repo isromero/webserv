@@ -6,13 +6,13 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:44:05 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/21 21:11:23 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/22 17:13:38 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Request.hpp"
 
-Request::Request(int clientfd, int serverPort) : _request(""), _method(""), _requestedFile(""), _headers(), _body(""), _serverPort(serverPort)
+Request::Request(int clientfd, int serverPort) : _request(""), _method(""), _requestedFile(""), _headers(), _body(""), _isChunked(false), _serverPort(serverPort)
 {
 	this->_readRequest(clientfd);
 }
@@ -49,6 +49,14 @@ void Request::_readRequest(int clientfd)
 					if (endOfLength != std::string::npos)
 						contentLength = std::atoi(headers.substr(contentLengthPos, endOfLength - contentLengthPos).c_str()); // Get the content length number
 				}
+
+				size_t chunkedPos = headers.find("Transfer-Encoding: chunked");
+				if (chunkedPos != std::string::npos)
+				{
+					this->_isChunked = true;
+					contentLength = 0; // Chunked encoding, we don't know the content length
+				}
+
 				// Calculate the total body read
 				totalBodyRead = this->_request.size() - (pos + 4);
 			}
@@ -267,7 +275,7 @@ StatusCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &contentLengt
 	{
 		// No Content-Length specified, check for Transfer-Encoding
 		it = this->_headers.find("Transfer-Encoding");
-		if (it != this->_headers.end() && it->second == "chunked") // Actually, we don't support chunked encoding
+		if (it != this->_headers.end() && it->second == "chunked")
 			return ERROR_411;
 	}
 
@@ -276,13 +284,43 @@ StatusCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &contentLengt
 
 StatusCode Request::_parseBody(size_t &pos, size_t &contentLength)
 {
+	if (this->_isChunked)
+	{
+		// When a request is chunked looks like this: POST /index.html HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n7\r\nchunked\r\n0\r\n\r\n
+		// The numbers are the size of the chunk in hexadecimal, so we need to convert them to integer
+		std::string dechunkedBody;
+		while (1)
+		{
+			size_t lineEnd = this->_request.find("\r\n", pos);
+			if (lineEnd == std::string::npos)
+				return ERROR_400;
+
+			std::string chunkSizeStr = this->_request.substr(pos, lineEnd - pos);
+			size_t chunkSize = std::strtol(chunkSizeStr.c_str(), NULL, 16); // Convert the chunk size from hexadecimal to integer
+
+			pos = lineEnd + 2; // Skip the \r\n
+
+			if (chunkSize == 0) // Last chunk
+				break;
+
+			if (pos + chunkSize > this->_request.size())
+				return ERROR_400;
+
+			dechunkedBody += this->_request.substr(pos, chunkSize);
+			pos += chunkSize + 2; // Skip the \r\n
+		}
+		this->_body = dechunkedBody;
+
+		return NO_STATUS_CODE;
+	}
+
 	size_t remainingLength = this->_request.size() - pos;
 
 	if (contentLength > 0)
 	{
 		if (remainingLength < contentLength)
 			return ERROR_400;
-		this->_body = this->_request.substr(pos, contentLength);
+		this->_body = this->_request.substr(pos, contentLength); // Truncate the body to the specified Content-Length
 	}
 	else if (remainingLength > 0)
 		this->_body = this->_request.substr(pos); // No Content-Length specified, consume the remaining data
