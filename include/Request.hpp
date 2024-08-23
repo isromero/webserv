@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:42:12 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/22 16:42:44 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/23 21:05:24 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,6 +24,7 @@
 
 #include "status.hpp"
 #include "utils.hpp"
+#include "ServerConfig.hpp"
 
 class Request
 {
@@ -34,7 +35,7 @@ private:
 	std::map<std::string, std::string> _headers;
 	std::string _body;
 	bool _isChunked;
-	int _serverPort; // TODO: Change this when we have the config file for saving all in one class???
+	ServerConfig _config;
 
 	void _readRequest(int clientfd);
 
@@ -43,7 +44,7 @@ private:
 	StatusCode _parseBody(size_t &pos, size_t &contentLength);
 
 public:
-	Request(int clientfd, int serverPort);
+	Request(int clientfd, const ServerConfig &config);
 	~Request();
 
 	StatusCode parseRequest();

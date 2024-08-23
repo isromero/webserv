@@ -10,185 +10,103 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-// ServerConfig.cpp
-
 #include "ServerConfig.hpp"
 
+ServerConfig::ServerConfig(const std::string &configFilePath) : _port(6969), _host("localhost"), _serverName("localhost"), _root("./"), _indexFile("index.html"), _clientMaxBodySize(1000000), _errorPages(""), _routeRoot(""), _allowedMethods("GET HEAD POST"), _redirect(""), _autoindex(false), _cgiExtension(".php"), _uploadEnable(false), _uploadSavePath("./"), _cgiBinPath("./")
+{
 
-//TODO IMPLEMENTAR TODA ESTA INFORMACION PARSEADA EN EL CODIGO
-int ServerConfig::getPort() const { return _port; }
-std::string ServerConfig::getHost() const { return _host; }
-std::string ServerConfig::getServerName() const { return _serverName; }
-std::string ServerConfig::getRoot() const { return _root; }
-std::string ServerConfig::getIndexFile() const { return _indexFile; }
-size_t ServerConfig::getClientMaxBodySize() const { return _clientMaxBodySize; }
-std::string ServerConfig::getErrorPages() const { return _errorPages; }
-std::string ServerConfig::getRouteRoot() const { return _routeRoot; }
-std::string ServerConfig::getAllowedMethods() const { return _allowedMethods; }
-std::string ServerConfig::getRedirect() const { return _redirect; }
-bool ServerConfig::getAutoindex() const { return _autoindex; }
-std::string ServerConfig::getCgiExtension() const { return _cgiExtension; }
-bool ServerConfig::getUploadEnable() const { return _uploadEnable; }
-std::string ServerConfig::getUploadSavePath() const { return _uploadSavePath; }
-std::string ServerConfig::getCgiBinPath() const { return _cgiBinPath; }
-
-
-void ServerConfig::setPort(int port) { this->_port = port; }
-void ServerConfig::setHost(const std::string &host) { _host = host; }
-void ServerConfig::setServerName(const std::string &serverName) { _serverName = serverName; }
-void ServerConfig::setRoot(const std::string &root) { _root = root; }
-void ServerConfig::setIndexFile(const std::string &indexFile) { _indexFile = indexFile; }
-void ServerConfig::setClientMaxBodySize(size_t size) { _clientMaxBodySize = size; }
-void ServerConfig::setErrorPages(const std::string &errorPages) { _errorPages = errorPages; }
-void ServerConfig::setRouteRoot(const std::string &routeRoot) { _routeRoot = routeRoot; }
-void ServerConfig::setAllowedMethods(const std::string &allowedMethods) { _allowedMethods = allowedMethods; }
-void ServerConfig::setRedirect(const std::string &redirect) { _redirect = redirect; }
-void ServerConfig::setAutoindex(bool autoindex) { _autoindex = autoindex; }
-void ServerConfig::setCgiExtension(const std::string &cgiExtension) { _cgiExtension = cgiExtension; }
-void ServerConfig::setUploadEnable(bool uploadEnable) { _uploadEnable = uploadEnable; }
-void ServerConfig::setUploadSavePath(const std::string &uploadSavePath) { _uploadSavePath = uploadSavePath; }
-void ServerConfig::setCgiBinPath(const std::string &cgiBinPath) { _cgiBinPath = cgiBinPath;}
-
-
-int stringToInt(const std::string& str) {
-    std::stringstream ss(str);
-    int result;
-    ss >> result;
-    return result;
+	try
+	{
+		this->_parseConfigFile(configFilePath);
+	}
+	catch (const std::exception &e)
+	{
+		std::cerr << "Error parsing config file: " << e.what() << std::endl;
+		exit(EXIT_FAILURE);
+	}
 }
 
-void parseConfigFile(const std::string &filePath, ServerConfig &config) {
-    std::ifstream configFile(filePath.c_str());
+ServerConfig::ServerConfig(const ServerConfig &other) : _port(other._port), _host(other._host), _serverName(other._serverName), _root(other._root), _indexFile(other._indexFile), _clientMaxBodySize(other._clientMaxBodySize), _errorPages(other._errorPages), _routeRoot(other._routeRoot), _allowedMethods(other._allowedMethods), _redirect(other._redirect), _autoindex(other._autoindex), _cgiExtension(other._cgiExtension), _uploadEnable(other._uploadEnable), _uploadSavePath(other._uploadSavePath), _cgiBinPath(other._cgiBinPath) {}
 
-    if (!configFile.is_open()) {
-        throw std::runtime_error("Unable to open config file: " + filePath);
-    }
+ServerConfig::~ServerConfig() {}
 
-    std::string line;
-    while (std::getline(configFile, line)) {
-        std::istringstream iss(line);
-        std::string key;
+void ServerConfig::_parseConfigFile(const std::string &filePath)
+{
+	std::ifstream configFile(filePath.c_str());
+	if (!configFile.is_open())
+		throw std::runtime_error("Error opening the config file");
 
-        // Skip empty lines and comments
-        if (line.empty() || line[0] == '#') {
-            continue;
-        }
+	std::string line;
+	int lineNum = 0;
+	bool isServerBlock = false;
 
-        iss >> key;
+	while (std::getline(configFile, line))
+	{
+		++lineNum;
+		trim(line);
+		trimTabs(line);
 
-        if (key == "listen") {
-            int port;
-            if (!(iss >> port)) {
-                std::cerr << "Invalid port value" << std::endl;
-                continue;
-            }
-            config.setPort(port);
-        }
-        else if (key == "server_name") {
-            std::string serverName;
-            if (!(iss >> serverName)) {
-                std::cerr << "Invalid server name value" << std::endl;
-                continue;
-            }
-            config.setServerName(serverName);
-        }
-        else if (key == "root") {
-            std::string root;
-            if (!(iss >> root)) {
-                std::cerr << "Invalid root value" << std::endl;
-                continue;
-            }
-            config.setRoot(root);
-        }
-        else if (key == "index") {
-            std::string indexFile;
-            if (!(iss >> indexFile)) {
-                std::cerr << "Invalid index file value" << std::endl;
-                continue;
-            }
-            config.setIndexFile(indexFile);
-        }
-        else if (key == "client_max_body_size") {
-            std::string sizeStr;
-            if (!(iss >> sizeStr)) {
-                std::cerr << "Invalid client max body size value" << std::endl;
-                continue;
-            }
+		if (line.empty() || line[0] == '#') // Empty line or comment
+			continue;
 
-            // Convertir tamaño de "2M" a bytes, ejemplo simple
-           size_t clientMaxBodySize = stringToInt(sizeStr.substr(0, sizeStr.size() - 1)) * 1024 * 1024;
-            config.setClientMaxBodySize(clientMaxBodySize);
-        }
-        else if (key == "error_page") {
-            int errorCode;
-            std::string errorPage;
-            if (!(iss >> errorCode >> errorPage)) {
-                std::cerr << "Invalid error page format" << std::endl;
-                continue;
-            }
-            std::string errorPages = config.getErrorPages();
-            errorPages += toString(errorCode) + " " + errorPage + "; ";
-            config.setErrorPages(errorPages);
-        }
-        else if (key == "location") {
-            std::string locationPath;
-            if (!(iss >> locationPath)) {
-                std::cerr << "Invalid location path" << std::endl;
-                continue;
-            }
-            if (locationPath == "/") {
-                std::string param;
-                while (iss >> param) {
-                    if (param == "allowed_methods") {
-                        std::string methods;
-                        if (!(iss >> methods)) {
-                            std::cerr << "Invalid methods value" << std::endl;
-                            continue;
-                        }
-                        config.setAllowedMethods(methods);
-                    }
-                    else if (param == "autoindex") {
-                        std::string autoindex;
-                        if (!(iss >> autoindex)) {
-                            std::cerr << "Invalid autoindex value" << std::endl;
-                            continue;
-                        }
-                        config.setAutoindex(autoindex == "on");
-                    }
-                    else if (param == "upload_dir") {
-                        std::string uploadDir;
-                        if (!(iss >> uploadDir)) {
-                            std::cerr << "Invalid upload dir value" << std::endl;
-                            continue;
-                        }
-                        config.setUploadSavePath(uploadDir);
-                    }
-                }
-            }
-            else if (locationPath == "/cgi-bin/") {
-                std::string param;
-                while (iss >> param) {
-                    if (param == "cgi_extension") {
-                        std::string cgiExt;
-                        if (!(iss >> cgiExt)) {
-                            std::cerr << "Invalid CGI extension value" << std::endl;
-                            continue;
-                        }
-                        config.setCgiExtension(cgiExt);
-                    }
-                    else if (param == "cgi_bin") {
-                        std::string cgiBin;
-                        if (!(iss >> cgiBin)) {
-                            std::cerr << "Invalid CGI bin value" << std::endl;
-                            continue;
-                        }
-                        config.setCgiBinPath(cgiBin);
-                    }
-                }
-            }
-        }
-    }
+		if (line == "server {")
+		{
+			isServerBlock = true;
+			continue;
+		}
 
-    configFile.close();
+		if (line == "}")
+		{
+			isServerBlock = false;
+			continue;
+		}
+
+		if (!isServerBlock)
+			throw std::runtime_error("Config outside server block at line " + toString(lineNum));
+
+		if (line.find("location") == 0) // Find returns 0 if the string starts with "location"
+		{
+			std::string locationPath = line.substr(9); // Skip "location "
+			trim(locationPath);
+			trimTabs(locationPath);
+			locationPath.substr(0, locationPath.size() - 1); // Remove the {
+
+			std::vector<std::string> locationBlock;
+			while (std::getline(configFile, line))
+			{
+				++lineNum;
+				trim(line);
+				trimTabs(line);
+
+				if (line.empty() || line[0] == '#') // Empty line or comment
+					continue;
+
+				if (line == "}") // End of location block
+					break;
+
+				locationBlock.push_back(line);
+			}
+			try
+			{
+				this->_parseLocationBlock(locationPath, locationBlock);
+			}
+			catch (const std::exception &e)
+			{
+				throw std::runtime_error("Error parsing location block at line " + toString(lineNum) + ": " + e.what());
+			}
+		}
+	}
+
+	configFile.close();
 }
 
+void ServerConfig::_parseLocationBlock(const std::string &locationPath, const std::vector<std::string> &locationBlock)
+{
+}
+
+int ServerConfig::getPort() const { return this->_port; }
+std::string ServerConfig::getServerName() const { return this->_serverName; }
+std::string ServerConfig::getHost() const { return this->_host; }
+std::string ServerConfig::getRoot() const { return this->_root; }
+std::string ServerConfig::getIndex() const { return this->_index; }
+size_t ServerConfig::getClientMaxBodySize() const { return this->_clientMaxBodySize; }

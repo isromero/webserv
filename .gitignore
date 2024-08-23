@@ -37,3 +37,7 @@ webserv
 
 
 .DS_Store
+
+# test project subject
+./subject_tests
+./YoupiBanane

@@ -6,13 +6,13 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:44:05 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/22 17:13:38 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/23 22:06:00 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Request.hpp"
 
-Request::Request(int clientfd, int serverPort) : _request(""), _method(""), _requestedFile(""), _headers(), _body(""), _isChunked(false), _serverPort(serverPort)
+Request::Request(int clientfd, const ServerConfig &config) : _request(""), _method(""), _requestedFile(""), _headers(), _body(""), _isChunked(false), _config(config)
 {
 	this->_readRequest(clientfd);
 }
@@ -262,9 +262,9 @@ StatusCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &contentLengt
 	std::map<std::string, std::string>::iterator hostIt = this->_headers.find("Host");
 	std::string hostValue = hostIt->second;
 	std::ostringstream oss;
-	oss << "localhost:" << this->_serverPort; // TODO: Change host when we have the config file
+	oss << this->_config.getServerName() << ":" << this->_config.getPort();
 	std::string hostWithPort = oss.str();
-	if (hostValue.empty() || (hostValue != hostWithPort && hostValue != "localhost")) // TODO: Change hosts when we have the config file
+	if (hostValue.empty() || hostValue != hostWithPort || hostValue != this->_config.getServerName())
 		return ERROR_400;
 
 	// Check for Content-Length

@@ -12,27 +12,43 @@
 
 #include "Server.hpp"
 
-Server::Server(const std::string &configFilePath) : _socket(0), _config() {
-    try {
-        // Cargar la configuración
-        parseConfigFile(configFilePath, _config);
-
-        // Configurar el socket con el puerto de la configuración
-        _socket = Socket(_config.getPort()); // Crear el socket con el puerto de configuración
-        _socket.init(); // Inicializar el socket con la configuración
-
-    } catch (const std::exception &e) {
-        std::cerr << "Error initializing server: " << e.what() << std::endl;
-        exit(EXIT_FAILURE);
-    }
+Server::Server() : _socket(0), _config("var/www/config/default.conf")
+{
+	try
+	{
+		this->_socket = Socket(this->_config.getPort());
+		this->_socket.init();
+	}
+	catch (const std::exception &e)
+	{
+		std::cerr << "Error initializing server: " << e.what() << std::endl;
+		exit(EXIT_FAILURE);
+	}
 }
 
-Server::Server(const Server &other) : _socket(other._socket) {}
+Server::Server(const std::string &configFilePath) : _socket(0), _config(configFilePath)
+{
+	try
+	{
+		this->_socket = Socket(this->_config.getPort());
+		this->_socket.init();
+	}
+	catch (const std::exception &e)
+	{
+		std::cerr << "Error initializing server: " << e.what() << std::endl;
+		exit(EXIT_FAILURE);
+	}
+}
+
+Server::Server(const Server &other) : _socket(other._socket), _config(other._config) {}
 
 Server &Server::operator=(const Server &other)
 {
 	if (this != &other)
+	{
 		this->_socket = other._socket;
+		this->_config = other._config;
+	}
 	return *this;
 }
 
@@ -185,7 +201,7 @@ int Server::_acceptClient()
 
 std::string Server::_processRequestResponse(int clientfd)
 {
-	Request request(clientfd, this->_socket.getPort());
+	Request request(clientfd, this->_config);
 
 	StatusCode statusCode = request.parseRequest();
 	std::cout << request.getRequest() << std::endl;

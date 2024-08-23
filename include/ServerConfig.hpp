@@ -23,64 +23,46 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <vector>
+#include <map>
+
 #include "utils.hpp"
 
 class ServerConfig
 {
 private:
-    int _port;
-    std::string _host;
-    std::string _serverName;
-    std::string _root;
-    std::string _indexFile;
-    size_t _clientMaxBodySize;
-    std::string _errorPages; // Cambia esto según el formato que estés utilizando
-    std::string _routeRoot; // Cambia esto según el formato que estés utilizando
-    std::string _allowedMethods; // Cambia esto según el formato que estés utilizando
-    std::string _redirect; // Cambia esto según el formato que estés utilizando
-    bool _autoindex;
-    std::string _cgiExtension; // Cambia esto según el formato que estés utilizando
-    bool _uploadEnable;
-    std::string _uploadSavePath;
-    std::string _cgiBinPath;
+	int _port;
+	std::string _serverName;
+	std::string _host; // TODO: listen in X host in Socket??? Same like host header os is the serverName???
+	std::string _root;
+	std::string _index;
+	size_t _clientMaxBodySize;
+	std::map<int, std::string> _errorPages;
+	std::vector<LocationConfig> _locations;
+	struct LocationConfig
+	{
+		std::string path;
+		std::vector<std::string> allowedMethods;
+		bool autoindex;
+		std::string uploadDir;
+		std::string cgiExtension;
+		std::string cgiBin;
+	};
+
+	void _parseConfigFile(const std::string &filePath);
+	void _parseLocationBlock(const std::string &locationPath, const std::vector<std::string> &locationBlock);
 
 public:
-ServerConfig(){};
-// Getters
-    int getPort() const;
-    std::string getHost() const;
-    std::string getServerName() const;
-    std::string getRoot() const;
-    std::string getIndexFile() const;
-    size_t getClientMaxBodySize() const;
-    std::string getErrorPages() const;
-    std::string getRouteRoot() const;
-    std::string getAllowedMethods() const;
-    std::string getRedirect() const;
-    bool getAutoindex() const;
-    std::string getCgiExtension() const;
-    bool getUploadEnable() const;
-    std::string getUploadSavePath() const;
-    std::string getCgiBinPath() const;
+	ServerConfig(const std::string &configFilePath);
+	ServerConfig(const ServerConfig &other);
+	~ServerConfig();
 
-    // Setters
-    void setPort(int port);
-    void setHost(const std::string &host);
-    void setServerName(const std::string &serverName);
-    void setRoot(const std::string &root);
-    void setIndexFile(const std::string &indexFile);
-    void setClientMaxBodySize(size_t size);
-    void setErrorPages(const std::string &errorPages);
-    void setRouteRoot(const std::string &routeRoot);
-    void setAllowedMethods(const std::string &allowedMethods);
-    void setRedirect(const std::string &redirect);
-    void setAutoindex(bool autoindex);
-    void setCgiExtension(const std::string &cgiExtension);
-    void setUploadEnable(bool uploadEnable);
-    void setUploadSavePath(const std::string &uploadSavePath);
-    void setCgiBinPath(const std::string &cgiBinPath);
+	int getPort() const;
+	std::string getServerName() const;
+	std::string getHost() const;
+	std::string getRoot() const;
+	std::string getIndex() const;
+	size_t getClientMaxBodySize() const;
 };
-
-void parseConfigFile(const std::string &filePath, ServerConfig &config);
 
 #endif

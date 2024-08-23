@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:29:36 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/20 17:42:50 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/23 21:41:37 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -102,4 +102,17 @@ void trim(std::string &s) // Remove leading and trailing spaces
 {
 	ltrim(s);
 	rtrim(s);
+}
+
+void trimTabs(std::string &s) // Remove leading and trailing tabs
+{
+	std::string::iterator it = s.begin();
+	while (it != s.end() && *it == '\t')
+		++it;
+	s.erase(s.begin(), it);
+
+	std::string::reverse_iterator rit = s.rbegin();
+	while (rit != s.rend() && *rit == '\t')
+		++rit;
+	s.erase(rit.base(), s.end());
 }

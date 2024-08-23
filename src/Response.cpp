@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/21 22:08:43 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/22 17:46:38 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -537,14 +537,14 @@ const std::string Response::_generateHTMLPage(bool isError, const std::string &s
 	std::string responseBody;
 	std::string status;
 
-	status = statusLine.substr(9);
+	status = statusLine.substr(9); // Remove "HTTP/1.1 "
 
 	responseBody += "<!DOCTYPE html>\n";
 	responseBody += "<html lang=\"en\">\n";
 	responseBody += "<head>\n";
 	responseBody += "<meta charset=\"UTF-8\">\n";
 	responseBody += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n";
-	responseBody += "<title>" + status + "</title>\n"; // Remove "HTTP/1.1 "
+	responseBody += "<title>" + status + "</title>\n";
 	responseBody += "<style>\n";
 	responseBody += "body { text-align: center; margin-top: 50px; }\n";
 	if (isError)

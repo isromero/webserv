@@ -50,8 +50,8 @@ private:
 	void _sendResponse(int clientfd, const std::string &response);
 
 public:
+	Server();
 	Server(const std::string &configFilePath);
-	Server(int port);
 	Server(const Server &other);
 	Server &operator=(const Server &other);
 	~Server();
