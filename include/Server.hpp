@@ -42,8 +42,8 @@
 class Server
 {
 private:
-	Socket _socket;
 	ServerConfig _config;
+	Socket _socket;
 
 	int _acceptClient();
 	std::string _processRequestResponse(int clientfd);

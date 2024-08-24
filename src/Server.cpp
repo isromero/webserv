@@ -12,11 +12,10 @@
 
 #include "Server.hpp"
 
-Server::Server() : _socket(0), _config("var/www/config/default.conf")
+Server::Server() : _config("var/www/config/default.conf"), _socket(_config)
 {
 	try
 	{
-		this->_socket = Socket(this->_config.getPort());
 		this->_socket.init();
 	}
 	catch (const std::exception &e)
@@ -26,11 +25,10 @@ Server::Server() : _socket(0), _config("var/www/config/default.conf")
 	}
 }
 
-Server::Server(const std::string &configFilePath) : _socket(0), _config(configFilePath)
+Server::Server(const std::string &configFilePath) : _config(configFilePath), _socket(_config)
 {
 	try
 	{
-		this->_socket = Socket(this->_config.getPort());
 		this->_socket.init();
 	}
 	catch (const std::exception &e)
@@ -40,14 +38,14 @@ Server::Server(const std::string &configFilePath) : _socket(0), _config(configFi
 	}
 }
 
-Server::Server(const Server &other) : _socket(other._socket), _config(other._config) {}
+Server::Server(const Server &other) : _config(other._config), _socket(other._socket) {}
 
 Server &Server::operator=(const Server &other)
 {
 	if (this != &other)
 	{
-		this->_socket = other._socket;
 		this->_config = other._config;
+		this->_socket = other._socket;
 	}
 	return *this;
 }

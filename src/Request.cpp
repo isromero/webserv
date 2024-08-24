@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:44:05 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/23 22:06:00 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/24 10:52:43 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -253,6 +253,7 @@ StatusCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &contentLengt
 			pos++;
 	}
 
+	/* HOST CHECK */
 	// Check for Host header is only one(it is necessary just one)
 	size_t hostCount = this->_headers.count("Host");
 	if (hostCount != 1)
@@ -260,14 +261,41 @@ StatusCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &contentLengt
 
 	// Check for Host header value
 	std::map<std::string, std::string>::iterator hostIt = this->_headers.find("Host");
-	std::string hostValue = hostIt->second;
-	std::ostringstream oss;
-	oss << this->_config.getServerName() << ":" << this->_config.getPort();
-	std::string hostWithPort = oss.str();
-	if (hostValue.empty() || hostValue != hostWithPort || hostValue != this->_config.getServerName())
+	if (hostIt == this->_headers.end() || hostIt->second.empty()) // Header Host not found or empty value of Host
 		return ERROR_400;
 
-	// Check for Content-Length
+	std::string hostValue = hostIt->second;
+	std::vector<std::string> serverNames = this->_config.getServerNames();
+
+	// Remove port from hostValue if present
+	size_t colonPos = hostValue.find(':');
+	std::string hostWithoutPort = (colonPos != std::string::npos) ? hostValue.substr(0, colonPos) : hostValue;
+
+	// Check if the host matches any of the server names
+	bool hostMatches = false;
+	for (std::vector<std::string>::const_iterator it = serverNames.begin(); it != serverNames.end(); ++it)
+	{
+		if (*it == hostWithoutPort || *it == hostValue)
+		{
+			hostMatches = true;
+			break;
+		}
+	}
+
+	// Check if host matches with port
+	if (!hostMatches)
+	{
+		std::ostringstream oss;
+		oss << hostWithoutPort << ":" << this->_config.getPort();
+		std::string hostWithPort = oss.str();
+		if (hostValue == hostWithPort)
+			hostMatches = true;
+	}
+
+	if (!hostMatches)
+		return ERROR_400;
+
+	/* CONTENT-LENGTH CHECK */
 	std::map<std::string, std::string>::iterator it = this->_headers.find("Content-Length");
 	if (it != this->_headers.end())
 		contentLength = static_cast<size_t>(std::atoi(it->second.c_str()));

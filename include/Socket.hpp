@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Socket.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: adgutier <adgutier@student.42madrid.com    +#+  +:+       +#+        */
+/*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 12:20:23 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/14 18:06:14 by adgutier         ###   ########.fr       */
+/*   Updated: 2024/08/24 11:01:18 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,13 +21,14 @@
 #include <cerrno>
 #include <cstring>
 
+#include "ServerConfig.hpp"
 
 #define MAX_CLIENTS 10000
 
 class Socket
 {
 private:
-	int _port;
+	ServerConfig _config;
 	int _serverfd;
 
 	void _createSocket();
@@ -36,11 +37,10 @@ private:
 	void _listenSocket();
 
 public:
-	Socket(int port);
+	Socket(ServerConfig config);
 	~Socket();
 
 	void init();
-	int getPort() const;
 	int getServerFd() const;
 };
 

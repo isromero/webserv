@@ -6,13 +6,13 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 12:21:58 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/14 12:48:54 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/24 11:01:16 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Socket.hpp"
 
-Socket::Socket(int port) : _port(port), _serverfd(-1) {}
+Socket::Socket(ServerConfig config) : _config(config), _serverfd(-1) {}
 
 Socket::~Socket()
 {
@@ -43,8 +43,8 @@ void Socket::_bindSocket()
 	// Create the server address
 	struct sockaddr_in serverAddress;
 	serverAddress.sin_family = AF_INET;
-	serverAddress.sin_addr.s_addr = INADDR_ANY;	 // TODO: Think if we want to do the server with Ipv4 and Ipv6 (we need to use addrinfo, gai_strerror...)
-	serverAddress.sin_port = htons(this->_port); // htons converts the port number to network byte order
+	serverAddress.sin_addr.s_addr = INADDR_ANY;				 // TODO: Think if we want to do the server with Ipv4 and Ipv6 (we need to use addrinfo, gai_strerror...)
+	serverAddress.sin_port = htons(this->_config.getPort()); // htons converts the port number to network byte order
 
 	// Bind the socket to the address and port
 	if (bind(this->_serverfd, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) == -1)
@@ -64,11 +64,6 @@ void Socket::init()
 	this->_configureSocket();
 	this->_bindSocket();
 	this->_listenSocket();
-}
-
-int Socket::getPort() const
-{
-	return this->_port;
 }
 
 int Socket::getServerFd() const
