@@ -6,13 +6,13 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:44:05 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/25 12:37:57 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/25 13:29:59 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Request.hpp"
 
-Request::Request(int clientfd, const ServerConfig &config) : _request(""), _method(""), _requestedFile(""), _headers(), _body(""), _isChunked(false), _config(config)
+Request::Request(int clientfd, const ServerConfig &config) : _request(""), _method(""), _path(""), _headers(), _body(""), _isChunked(false), _config(config)
 {
 	this->_readRequest(clientfd);
 }
@@ -156,15 +156,15 @@ StatusCode Request::_parseRequestLine(size_t &pos, size_t &end)
 			// Absolute-form request, extract path after the authority. Eg: GET http://localhost:6969/index.html HTTP/1.1
 			size_t pathStart = uri.find('/', uri.find("://") + 3);
 			if (pathStart != std::string::npos)
-				this->_requestedFile = uri.substr(pathStart);
+				this->_path = uri.substr(pathStart);
 			else
-				this->_requestedFile = "/";
+				this->_path = "/";
 		}
 		else
-			this->_requestedFile = uri; // Relative-form this->_request. Eg: GET /index.html HTTP/1.1
-		if (this->_requestedFile.find(' ') != std::string::npos || this->_requestedFile.empty())
+			this->_path = uri; // Relative-form this->_request. Eg: GET /index.html HTTP/1.1
+		if (this->_path.find(' ') != std::string::npos || this->_path.empty())
 			return ERROR_400;
-		this->_requestedFile = secureFilePath(this->_requestedFile);
+		this->_path = secureFilePath(this->_path);
 	}
 	else if (requestLine.find("HTTP/1.1") == std::string::npos)
 		return ERROR_505;
@@ -359,9 +359,9 @@ const std::string &Request::getMethod() const
 	return this->_method;
 }
 
-const std::string &Request::getRequestedFile() const
+const std::string &Request::getPath() const
 {
-	return this->_requestedFile;
+	return this->_path;
 }
 
 const std::map<std::string, std::string> &Request::getHeaders() const

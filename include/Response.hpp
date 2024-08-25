@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:52:54 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/25 12:47:35 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/25 13:28:36 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -35,12 +35,12 @@ private:
 	std::string _response;
 	std::string _request;
 	std::string _method;
-	std::string _requestedFile;
+	std::string _requestedPath;
 	std::map<std::string, std::string> _requestHeaders;
 	std::string _requestBody;
 	std::map<std::string, std::string> _responseHeaders;
 	std::string _responseBody;
-	std::string _responseFile;
+	std::string _responsePath;
 	std::string _locationHeader;
 	std::map<std::string, std::string> _cgiHeaders;
 	std::string _cgiBody;
@@ -56,7 +56,7 @@ private:
 	const std::string _generateHTMLPage(bool isError, const std::string &statusLine, const std::string &body);
 
 public:
-	Response(const std::string &request, const std::string &method, const std::string &requestedFile, const std::map<std::string, std::string> &headers, const std::string &body, const ServerConfig &config);
+	Response(const std::string &request, const std::string &method, const std::string &requestedPath, const std::map<std::string, std::string> &headers, const std::string &body, const ServerConfig &config);
 	~Response();
 
 	const std::string handleResponse(StatusCode statusCode);

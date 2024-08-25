@@ -6,14 +6,14 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/25 13:16:28 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/25 13:28:56 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Response.hpp"
 
-Response::Response(const std::string &request, const std::string &method, const std::string &requestedFile, const std::map<std::string, std::string> &headers, const std::string &body, const ServerConfig &config)
-	: _response(""), _request(request), _method(method), _requestedFile(requestedFile), _requestHeaders(headers), _requestBody(body), _responseHeaders(), _responseBody(""), _responseFile(""), _locationHeader(""), _cgiHeaders(), _cgiBody(""), _config(config)
+Response::Response(const std::string &request, const std::string &method, const std::string &requestedPath, const std::map<std::string, std::string> &headers, const std::string &body, const ServerConfig &config)
+	: _response(""), _request(request), _method(method), _requestedPath(requestedPath), _requestHeaders(headers), _requestBody(body), _responseHeaders(), _responseBody(""), _responsePath(""), _locationHeader(""), _cgiHeaders(), _cgiBody(""), _config(config)
 {
 }
 
@@ -31,7 +31,7 @@ const std::string Response::handleResponse(StatusCode statusCode)
 	case SUCCESS_200:
 		statusLine = "HTTP/1.1 200 OK";
 		if (this->_method == "GET")
-			this->_responseBody = readFile(this->_responseFile);
+			this->_responseBody = readFile(this->_responsePath);
 		break;
 	case SUCCESS_201:
 		statusLine = "HTTP/1.1 201 Created";
@@ -147,7 +147,7 @@ const std::string Response::handleResponse(StatusCode statusCode)
 	else if (!isError && !this->_isCGIRequest())
 	{
 		if ((statusCode == SUCCESS_200 && this->_method == "GET")) // If it is a success, we determine the content type because we are serving a file
-			this->_responseHeaders["Content-Type"] = this->_determineContentType(this->_responseFile);
+			this->_responseHeaders["Content-Type"] = this->_determineContentType(this->_responsePath);
 		else
 		{
 			this->_responseHeaders["Content-Type"] = "text/html"; // Other sucess messages we return an HTML page
@@ -181,7 +181,7 @@ StatusCode Response::handleMethods()
 
 bool Response::_isCGIRequest() const
 {
-	if (this->_requestedFile.substr(0, 9) == "/cgi-bin/") // This means that the requested file is a CGI script because starts with /cgi-bin/
+	if (this->_requestedPath.substr(0, 9) == "/cgi-bin/") // This means that the requested file is a CGI script because starts with /cgi-bin/
 		return true;
 	return false;
 }
@@ -236,7 +236,7 @@ StatusCode Response::_handleCGI()
 			setenv("CONTENT_LENGTH", toString(this->_requestBody.size()).c_str(), 1); // Not necessary in GET requests
 		}
 
-		std::string scriptName = this->_requestedFile;
+		std::string scriptName = this->_requestedPath;
 		std::string pathInfo = "";
 		std::string queryString = "";
 
@@ -265,7 +265,7 @@ StatusCode Response::_handleCGI()
 
 		// CGIs need to have some environment variables set
 		setenv("REQUEST_METHOD", this->_method.c_str(), 1);
-		setenv("SCRIPT_NAME", this->_requestedFile.c_str(), 1);
+		setenv("SCRIPT_NAME", this->_requestedPath.c_str(), 1);
 		setenv("CONTENT_TYPE", _determineContentType(scriptPath).c_str(), 1);
 		setenv("GATEWAY_INTERFACE", "CGI/1.1", 1);
 		setenv("SERVER_PROTOCOL", "HTTP/1.1", 1);
@@ -321,36 +321,36 @@ StatusCode Response::_handleCGI()
 
 StatusCode Response::_handleGET()
 {
-	if (this->_requestedFile[this->_requestedFile.size() - 1] == '/') // If is a directory just serve the index file in the server config
+	if (this->_requestedPath[this->_requestedPath.size() - 1] == '/') // If is a directory just serve the index file in the server config
 	{
 		std::vector<std::string> indexes = this->_config.getIndexes();
 		if (indexes.empty())
-			this->_responseFile = this->_config.getRoot() + this->_requestedFile; // Serve the directory
+			this->_responsePath = this->_config.getRoot() + this->_requestedPath; // Serve the directory
 
 		for (std::vector<std::string>::iterator it = indexes.begin(); it != indexes.end(); ++it)
 		{
-			if (access((this->_config.getRoot() + this->_requestedFile + *it).c_str(), F_OK) == 0)
+			if (access((this->_config.getRoot() + this->_requestedPath + *it).c_str(), F_OK) == 0)
 			{
-				this->_responseFile = this->_config.getRoot() + this->_requestedFile + *it;
+				this->_responsePath = this->_config.getRoot() + this->_requestedPath + *it;
 				break;
 			}
 		}
-		if (this->_responseFile.empty()) // TODO: Check autoindex, if is deactivated and there is no index file, return 403
+		if (this->_responsePath.empty()) // TODO: Check autoindex, if is deactivated and there is no index file, return 403
 			return ERROR_403;
 	}
 	else
-		this->_responseFile = this->_config.getRoot() + this->_requestedFile;
+		this->_responsePath = this->_config.getRoot() + this->_requestedPath;
 
 	// Check if the file has an extension, if not add .html
-	if (this->_responseFile.substr(1).find_last_of(".") == std::string::npos) // substr(1) to skip the first "./"root_path
+	if (this->_responsePath.substr(1).find_last_of(".") == std::string::npos) // substr(1) to skip the first "./"root_path
 	{
-		if (this->_responseFile[this->_responseFile.size() - 1] != '/') // If is a directory, we don't add the extension
-			this->_responseFile += ".html";
+		if (this->_responsePath[this->_responsePath.size() - 1] != '/') // If is a directory, we don't add the extension
+			this->_responsePath += ".html";
 	}
 
-	if (access(this->_responseFile.c_str(), F_OK) != 0) // Check if the file exists
+	if (access(this->_responsePath.c_str(), F_OK) != 0) // Check if the file exists
 		return ERROR_404;
-	else if (access(this->_responseFile.c_str(), R_OK) != 0) // Check if the file is readable
+	else if (access(this->_responsePath.c_str(), R_OK) != 0) // Check if the file is readable
 		return ERROR_403;
 	else
 		return SUCCESS_200;
@@ -463,15 +463,15 @@ StatusCode Response::_handlePOST()
 StatusCode Response::_handleDELETE()
 {
 	std::string file;
-	if (this->_requestedFile.empty())
+	if (this->_requestedPath.empty())
 		return ERROR_400;
 	else if (this->_requestHeaders["Content-Length"].find("Content-Length") != std::string::npos && this->_requestHeaders["Content-Length"] != "0")
 		return ERROR_400;												   // DELETE request should not have a body, if there is present Content-Length header, it should be 0
-	else if (this->_requestedFile[this->_requestedFile.size() - 1] == '/') // If is a directory, we don't allow to delete it
+	else if (this->_requestedPath[this->_requestedPath.size() - 1] == '/') // If is a directory, we don't allow to delete it
 		return ERROR_403;
 	else
 	{
-		file = this->_config.getRoot() + this->_requestedFile;
+		file = this->_config.getRoot() + this->_requestedPath;
 		if (access(file.c_str(), F_OK) != 0) // Check if the file exists
 			return ERROR_404;
 		else if (access(file.c_str(), W_OK) != 0) // Check if the file is writable

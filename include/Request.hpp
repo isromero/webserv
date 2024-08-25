@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:42:12 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/23 21:05:24 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/25 13:29:31 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -31,7 +31,7 @@ class Request
 private:
 	std::string _request;
 	std::string _method;
-	std::string _requestedFile;
+	std::string _path;
 	std::map<std::string, std::string> _headers;
 	std::string _body;
 	bool _isChunked;
@@ -51,7 +51,7 @@ public:
 
 	const std::string &getRequest() const;
 	const std::string &getMethod() const;
-	const std::string &getRequestedFile() const;
+	const std::string &getPath() const;
 	const std::map<std::string, std::string> &getHeaders() const;
 	const std::string &getBody() const;
 };

@@ -243,7 +243,7 @@ std::string Server::_processRequestResponse(int clientfd)
 
 	StatusCode statusCode = request.parseRequest();
 	std::cout << request.getRequest() << std::endl;
-	Response response(request.getRequest(), request.getMethod(), request.getRequestedFile(), request.getHeaders(), request.getBody(), this->_config);
+	Response response(request.getRequest(), request.getMethod(), request.getPath(), request.getHeaders(), request.getBody(), this->_config);
 	if (statusCode != NO_STATUS_CODE)
 		return response.handleResponse(statusCode);
 
