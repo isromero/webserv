@@ -12,7 +12,7 @@
 
 #include "ServerConfig.hpp"
 
-ServerConfig::ServerConfig(const std::string &configFilePath) : _port(6969), _serverNames(), _host("0.0.0.0"), _root("/var/www/html"), _index("index.html"), _clientMaxBodySize(1024 * 1024), _errorPages(), _locations()
+ServerConfig::ServerConfig(const std::string &configFilePath) : _port(6969), _serverNames(), _host("0.0.0.0"), _root("/var/www/html"), _indexes(), _clientMaxBodySize(1024 * 1024), _errorPages(), _locations()
 {
 
 	try
@@ -26,7 +26,7 @@ ServerConfig::ServerConfig(const std::string &configFilePath) : _port(6969), _se
 	}
 }
 
-ServerConfig::ServerConfig(const ServerConfig &other) : _port(other._port), _serverNames(other._serverNames), _host(other._host), _root(other._root), _index(other._index), _clientMaxBodySize(other._clientMaxBodySize), _errorPages(other._errorPages), _locations(other._locations) {}
+ServerConfig::ServerConfig(const ServerConfig &other) : _port(other._port), _serverNames(other._serverNames), _host(other._host), _root(other._root), _indexes(other._indexes), _clientMaxBodySize(other._clientMaxBodySize), _errorPages(other._errorPages), _locations(other._locations) {}
 
 ServerConfig::~ServerConfig() {}
 
@@ -125,41 +125,45 @@ void ServerConfig::_parseConfigFile(const std::string &filePath)
 
 void ServerConfig::_parseServerParameters(const std::string &param, std::string &value)
 {
-	if (param == "port")
+	if (param == "listen")
 	{
 		this->_port = std::atoi(value.c_str());
-		if (this->_port < 1 || this->_port > 65535)
-			throw std::runtime_error("Invalid port number: " + value);
+		if (this->_port < 0 || this->_port > 65535)
+			throw std::runtime_error("Invalid port: " + value);
 	}
 	else if (param == "server_name")
 	{
-		std::istringstream iss;
+		std::istringstream iss(value);
 		while (iss >> value)
-		{
-			if (value[value.size() - 1] == ';') // Last server_name
-			{
-				value = value.substr(0, value.size() - 1);
-				this->_serverNames.push_back(value);
-				break;
-			}
 			this->_serverNames.push_back(value);
-		}
 	}
 	else if (param == "host")
 		this->_host = value;
 	else if (param == "root")
 	{
-		this->_root = value;
+		this->_root = "." + value;
 		if (access(this->_root.c_str(), F_OK) == -1)
 			throw std::runtime_error("Root directory does not exist: " + this->_root);
 	}
 	else if (param == "index")
-		this->_index = value;
+	{
+		std::istringstream iss(value);
+		while (iss >> value)
+			this->_indexes.push_back(value);
+	}
 	else if (param == "client_max_body_size")
 	{
-		this->_clientMaxBodySize = std::atoi(value.c_str());
-		if (this->_clientMaxBodySize < 0)
-			throw std::runtime_error("Invalid client_max_body_size: " + value);
+		std::string sizeUnit = value.substr(value.size() - 1);
+
+		size_t size = std::atoi(value.substr(0, value.size() - 1).c_str());
+		if (sizeUnit == "k" || sizeUnit == "K")
+			this->_clientMaxBodySize = size * 1024;
+		else if (sizeUnit == "m" || sizeUnit == "M")
+			this->_clientMaxBodySize = size * 1024 * 1024;
+		else if (sizeUnit == "g" || sizeUnit == "G")
+			this->_clientMaxBodySize = size * 1024 * 1024 * 1024;
+		else
+			throw std::runtime_error("Invalid size unit: " + sizeUnit);
 	}
 	else if (param == "error_page")
 	{
@@ -173,6 +177,12 @@ void ServerConfig::_parseServerParameters(const std::string &param, std::string 
 	}
 	else
 		throw std::runtime_error("Unknown server parameter: " + param);
+}
+
+static void removeSemicolon(std::string &str)
+{
+	if (str[str.size() - 1] == ';')
+		str = str.substr(0, str.size() - 1);
 }
 
 void ServerConfig::_parseLocationBlock(const std::string &locationPath, const std::vector<std::string> &locationBlock)
@@ -205,31 +215,34 @@ void ServerConfig::_parseLocationBlock(const std::string &locationPath, const st
 		{
 			std::string value;
 			iss >> value;
-			if (value[value.size() - 1] == ';')
-				value = value.substr(0, value.size() - 1);
+			removeSemicolon(value);
 			location.autoindex = (value == "on");
 		}
 		else if (param == "upload_dir")
 		{
 			iss >> location.uploadDir;
-			if (location.uploadDir[location.uploadDir.size() - 1] == ';')
-				location.uploadDir = location.uploadDir.substr(0, location.uploadDir.size() - 1);
+			removeSemicolon(location.uploadDir);
+			location.uploadDir = "." + location.uploadDir;
 			if (access(location.uploadDir.c_str(), F_OK) == -1)
 				throw std::runtime_error("Upload directory does not exist: " + location.uploadDir);
 		}
 		else if (param == "cgi_extension")
 		{
 			iss >> location.cgiExtension;
-			if (location.cgiExtension[location.cgiExtension.size() - 1] == ';')
-				location.cgiExtension = location.cgiExtension.substr(0, location.cgiExtension.size() - 1);
+			removeSemicolon(location.cgiExtension);
 		}
 		else if (param == "cgi_bin")
 		{
 			iss >> location.cgiBin;
-			if (location.cgiBin[location.cgiBin.size() - 1] == ';')
-				location.cgiBin = location.cgiBin.substr(0, location.cgiBin.size() - 1);
+			removeSemicolon(location.cgiBin);
+			location.cgiBin = "." + location.cgiBin;
 			if (access(location.cgiBin.c_str(), F_OK) == -1)
 				throw std::runtime_error("CGI bin directory does not exist: " + location.cgiBin);
+		}
+		else if (param == "redirect")
+		{
+			iss >> location.redirect;
+			removeSemicolon(location.redirect);
 		}
 		else
 			throw std::runtime_error("Unknown location parameter: " + param);
@@ -242,7 +255,7 @@ int ServerConfig::getPort() const { return this->_port; }
 std::vector<std::string> ServerConfig::getServerNames() const { return this->_serverNames; }
 std::string ServerConfig::getHost() const { return this->_host; }
 std::string ServerConfig::getRoot() const { return this->_root; }
-std::string ServerConfig::getIndex() const { return this->_index; }
+std::vector<std::string> ServerConfig::getIndexes() const { return this->_indexes; }
 size_t ServerConfig::getClientMaxBodySize() const { return this->_clientMaxBodySize; }
 std::map<int, std::string> ServerConfig::getErrorPages() const { return this->_errorPages; }
 std::vector<LocationConfig> ServerConfig::getLocations() const { return this->_locations; }

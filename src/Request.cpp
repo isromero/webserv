@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:44:05 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/24 10:52:43 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/25 12:37:57 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -266,30 +266,23 @@ StatusCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &contentLengt
 
 	std::string hostValue = hostIt->second;
 	std::vector<std::string> serverNames = this->_config.getServerNames();
+	bool hasPort = false;
 
-	// Remove port from hostValue if present
+	// Remove port from hostValue if present for comparison
 	size_t colonPos = hostValue.find(':');
-	std::string hostWithoutPort = (colonPos != std::string::npos) ? hostValue.substr(0, colonPos) : hostValue;
+	if (colonPos != std::string::npos)
+		hasPort = true;
+	std::string hostWithoutPort = hostValue.substr(0, colonPos);
 
-	// Check if the host matches any of the server names
 	bool hostMatches = false;
-	for (std::vector<std::string>::const_iterator it = serverNames.begin(); it != serverNames.end(); ++it)
+	for (std::vector<std::string>::iterator it = serverNames.begin(); it != serverNames.end(); ++it)
 	{
-		if (*it == hostWithoutPort || *it == hostValue)
+		std::string serverNameWithPort = *it + ":" + toString(this->_config.getPort());
+		if (serverNameWithPort == hostValue || (*it == hostWithoutPort && !hasPort))
 		{
 			hostMatches = true;
 			break;
 		}
-	}
-
-	// Check if host matches with port
-	if (!hostMatches)
-	{
-		std::ostringstream oss;
-		oss << hostWithoutPort << ":" << this->_config.getPort();
-		std::string hostWithPort = oss.str();
-		if (hostValue == hostWithPort)
-			hostMatches = true;
 	}
 
 	if (!hostMatches)

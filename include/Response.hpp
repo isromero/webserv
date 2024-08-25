@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:52:54 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/21 21:42:59 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/25 12:47:35 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,6 +23,7 @@
 
 #include "status.hpp"
 #include "utils.hpp"
+#include "ServerConfig.hpp"
 
 #if defined(__APPLE__)
 extern char **environ;
@@ -43,6 +44,7 @@ private:
 	std::string _locationHeader;
 	std::map<std::string, std::string> _cgiHeaders;
 	std::string _cgiBody;
+	ServerConfig _config;
 
 	StatusCode _handleCGI();
 	StatusCode _handleGET();
@@ -54,7 +56,7 @@ private:
 	const std::string _generateHTMLPage(bool isError, const std::string &statusLine, const std::string &body);
 
 public:
-	Response(const std::string &request, const std::string &method, const std::string &requestedFile, const std::map<std::string, std::string> &headers, const std::string &body);
+	Response(const std::string &request, const std::string &method, const std::string &requestedFile, const std::map<std::string, std::string> &headers, const std::string &body, const ServerConfig &config);
 	~Response();
 
 	const std::string handleResponse(StatusCode statusCode);

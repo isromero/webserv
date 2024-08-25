@@ -6,14 +6,14 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/22 17:46:38 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/25 13:04:43 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Response.hpp"
 
-Response::Response(const std::string &request, const std::string &method, const std::string &requestedFile, const std::map<std::string, std::string> &headers, const std::string &body)
-	: _response(""), _request(request), _method(method), _requestedFile(requestedFile), _requestHeaders(headers), _requestBody(body), _responseHeaders(), _responseBody(""), _responseFile(""), _locationHeader("")
+Response::Response(const std::string &request, const std::string &method, const std::string &requestedFile, const std::map<std::string, std::string> &headers, const std::string &body, const ServerConfig &config)
+	: _response(""), _request(request), _method(method), _requestedFile(requestedFile), _requestHeaders(headers), _requestBody(body), _responseHeaders(), _responseBody(""), _responseFile(""), _locationHeader(""), _cgiHeaders(), _cgiBody(""), _config(config)
 {
 }
 
@@ -321,24 +321,34 @@ StatusCode Response::_handleCGI()
 
 StatusCode Response::_handleGET()
 {
-	if (this->_requestedFile[this->_requestedFile.size() - 1] == '/') // If is a directory just serve the index.html or index.htm
+	if (this->_requestedFile[this->_requestedFile.size() - 1] == '/') // If is a directory just serve the index file in the server config
 	{
-		if (access(("pages" + this->_requestedFile + "index.html").c_str(), F_OK) == 0)
-			this->_responseFile = "pages" + this->_requestedFile + "index.html";
-		else if (access(("pages" + this->_requestedFile + "index.htm").c_str(), F_OK) == 0)
-			this->_responseFile = "pages" + this->_requestedFile + "index.htm";
+		std::vector<std::string> indexes = this->_config.getIndexes();
+		if (indexes.empty())
+			this->_responseFile = this->_config.getRoot() + this->_requestedFile; // Serve the directory
+
+		for (std::vector<std::string>::iterator it = indexes.begin(); it != indexes.end(); ++it)
+		{
+			if (access((this->_config.getRoot() + this->_requestedFile + *it).c_str(), F_OK) == 0)
+			{
+				this->_responseFile = this->_config.getRoot() + this->_requestedFile + *it;
+				break;
+			}
+		}
 	}
 	else
-		this->_responseFile = "pages" + this->_requestedFile;
+		this->_responseFile = this->_config.getRoot() + this->_requestedFile;
 
 	// Check if the file has an extension, if not add .html
-	if (this->_responseFile.find_last_of(".") == std::string::npos)
+	if (this->_responseFile.substr(1).find_last_of(".") == std::string::npos) // substr(1) to skip the first "./"root_path
 		this->_responseFile += ".html";
 
-	if (access(this->_responseFile.c_str(), R_OK) != 0) // Check if the file is readable
-		return ERROR_403;
-	else if (access(this->_responseFile.c_str(), F_OK) != 0) // Check if the file exists
+	std::cout << "Response filierhierterbhtehrbte: " << this->_responseFile << std::endl;
+
+	if (access(this->_responseFile.c_str(), F_OK) != 0) // Check if the file exists
 		return ERROR_404;
+	else if (access(this->_responseFile.c_str(), R_OK) != 0) // Check if the file is readable
+		return ERROR_403;
 	else
 		return SUCCESS_200;
 
@@ -458,11 +468,11 @@ StatusCode Response::_handleDELETE()
 		return ERROR_403;
 	else
 	{
-		file = "pages" + this->_requestedFile;
-		if (access(file.c_str(), W_OK) != 0) // Check if the file is writable
-			return ERROR_403;
-		else if (access(file.c_str(), F_OK) != 0) // Check if the file exists
+		file = this->_config.getRoot() + this->_requestedFile;
+		if (access(file.c_str(), F_OK) != 0) // Check if the file exists
 			return ERROR_404;
+		else if (access(file.c_str(), W_OK) != 0) // Check if the file is writable
+			return ERROR_403;
 		else if (remove(file.c_str()) == 0)
 			return SUCCESS_204;
 		else

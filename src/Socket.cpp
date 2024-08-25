@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 12:21:58 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/24 11:01:16 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/25 12:07:56 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -42,9 +42,17 @@ void Socket::_bindSocket()
 {
 	// Create the server address
 	struct sockaddr_in serverAddress;
+	memset(&serverAddress, 0, sizeof(serverAddress)); // Good practice
 	serverAddress.sin_family = AF_INET;
-	serverAddress.sin_addr.s_addr = INADDR_ANY;				 // TODO: Think if we want to do the server with Ipv4 and Ipv6 (we need to use addrinfo, gai_strerror...)
 	serverAddress.sin_port = htons(this->_config.getPort()); // htons converts the port number to network byte order
+
+	std::string host = this->_config.getHost();
+	if (host == "0.0.0.0")
+		serverAddress.sin_addr.s_addr = INADDR_ANY; // Listen in any address
+	else if (host == "localhost" || host == "127.0.0.1")
+		serverAddress.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // Listen in localhost
+	else
+		serverAddress.sin_addr.s_addr = inet_addr(host.c_str());
 
 	// Bind the socket to the address and port
 	if (bind(this->_serverfd, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) == -1)
