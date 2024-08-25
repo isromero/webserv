@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/25 13:04:43 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/25 13:16:28 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -335,15 +335,18 @@ StatusCode Response::_handleGET()
 				break;
 			}
 		}
+		if (this->_responseFile.empty()) // TODO: Check autoindex, if is deactivated and there is no index file, return 403
+			return ERROR_403;
 	}
 	else
 		this->_responseFile = this->_config.getRoot() + this->_requestedFile;
 
 	// Check if the file has an extension, if not add .html
 	if (this->_responseFile.substr(1).find_last_of(".") == std::string::npos) // substr(1) to skip the first "./"root_path
-		this->_responseFile += ".html";
-
-	std::cout << "Response filierhierterbhtehrbte: " << this->_responseFile << std::endl;
+	{
+		if (this->_responseFile[this->_responseFile.size() - 1] != '/') // If is a directory, we don't add the extension
+			this->_responseFile += ".html";
+	}
 
 	if (access(this->_responseFile.c_str(), F_OK) != 0) // Check if the file exists
 		return ERROR_404;
