@@ -14,7 +14,6 @@
 
 ServerConfig::ServerConfig(const std::string &configFilePath) : _port(6969), _serverNames(), _host("0.0.0.0"), _root("/var/www/html"), _indexes(), _clientMaxBodySize(1024 * 1024), _errorPages(), _locations()
 {
-
 	try
 	{
 		this->_parseConfigFile(configFilePath);
@@ -173,7 +172,9 @@ void ServerConfig::_parseServerParameters(const std::string &param, std::string 
 		iss >> errorCode >> errorPage;
 		if (errorCode < 400 || errorCode > 599)
 			throw std::runtime_error("Invalid error code: " + toString(errorCode));
-		this->_errorPages[errorCode] = errorPage;
+		this->_errorPages[errorCode] = this->_root + errorPage;
+		if (access(this->_errorPages[errorCode].c_str(), F_OK) == -1)
+			throw std::runtime_error("Error page does not exist: " + this->_errorPages[errorCode]);
 	}
 	else
 		throw std::runtime_error("Unknown server parameter: " + param);

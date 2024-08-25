@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:44:05 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/25 13:29:59 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/25 13:45:52 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -67,8 +67,8 @@ void Request::_readRequest(int clientfd)
 		if (headersRead && totalBodyRead >= contentLength)
 			break;
 
-		if (this->_request.size() > 102400) // ! Maximum request size: we can change this value
-			break;							// Request too large, then in parsing we return 400
+		if (this->_request.size() > this->_config.getClientMaxBodySize())
+			break; // Request too large, we don't read more for preventing attacks, then in parsing we return 400
 	}
 	if (bytesRead == -1)
 	{
@@ -88,8 +88,8 @@ StatusCode Request::parseRequest()
 {
 	if (this->_request.empty())
 		return ERROR_400;
-	else if (this->_request.size() >= 102400) // ! Maximum request size:  we can change this value
-		return ERROR_400;
+	else if (this->_request.size() >= this->_config.getClientMaxBodySize())
+		return ERROR_413;
 
 	size_t pos = 0;
 	size_t end = 0;
@@ -149,7 +149,7 @@ StatusCode Request::_parseRequestLine(size_t &pos, size_t &end)
 			return ERROR_505;
 
 		std::string uri = requestLine.substr(fileStart, fileEnd - fileStart);
-		if (uri.size() > 2048) // ! Maximum URI size: we can change this value
+		if (uri.size() > 2048)
 			return ERROR_414;
 		if (uri.find("://") != std::string::npos)
 		{

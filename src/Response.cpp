@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/25 13:28:56 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/25 13:59:01 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -141,8 +141,19 @@ const std::string Response::handleResponse(StatusCode statusCode)
 
 	if (isError)
 	{
-		this->_responseHeaders["Content-Type"] = "text/html"; // Error pages are always html
-		this->_responseBody = this->_generateHTMLPage(isError, statusLine, this->_responseBody);
+		std::map<int, std::string> errorPages = this->_config.getErrorPages();
+		std::string status = statusLine.substr(9, 3);
+		std::map<int, std::string>::iterator it = errorPages.find(std::atoi(status.c_str()));
+		if (it != errorPages.end())
+		{
+			this->_responseBody = readFile(it->second);
+			this->_responseHeaders["Content-Type"] = this->_determineContentType(it->second);
+		}
+		else
+		{
+			this->_responseHeaders["Content-Type"] = "text/html"; // Error pages are always html
+			this->_responseBody = this->_generateHTMLPage(isError, statusLine, this->_responseBody);
+		}
 	}
 	else if (!isError && !this->_isCGIRequest())
 	{
