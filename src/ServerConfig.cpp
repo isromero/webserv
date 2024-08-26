@@ -29,6 +29,14 @@ ServerConfig::ServerConfig(const ServerConfig &other) : _port(other._port), _ser
 
 ServerConfig::~ServerConfig() {}
 
+static const std::string extractMainPath(const std::string &fullPath)
+{
+	size_t lastSlash = fullPath.find_last_of('/');
+	if (lastSlash == 0)
+		return "/";
+	return fullPath.substr(0, lastSlash);
+}
+
 void ServerConfig::_parseConfigFile(const std::string &filePath)
 {
 	std::ifstream configFile(filePath.c_str());
@@ -68,7 +76,8 @@ void ServerConfig::_parseConfigFile(const std::string &filePath)
 			std::string locationPath = line.substr(9); // Skip "location "
 			trim(locationPath);
 			trimTabs(locationPath);
-			locationPath.substr(0, locationPath.size() - 1); // Remove the {
+			locationPath = locationPath.substr(0, locationPath.size() - 1); // Remove the {
+			trim(locationPath);												// Trim the spaces between the path and the {
 
 			std::vector<std::string> locationBlock;
 			while (std::getline(configFile, line))
@@ -250,6 +259,28 @@ void ServerConfig::_parseLocationBlock(const std::string &locationPath, const st
 	}
 
 	this->_locations.push_back(location);
+}
+
+bool ServerConfig::isMethodAllowed(const std::vector<LocationConfig> &locations, const std::string &path, const std::string &method) const
+{
+	const std::string mainPath = extractMainPath(path);
+	std::cout << "Main path: " << mainPath << std::endl;
+
+	// Find the best match for the path(best match is the longest path that matches the beginning of the request path)
+	// This prevents errors like "/" matching before "/route" when path is "/route"
+	for (std::vector<LocationConfig>::const_iterator it = locations.begin(); it != locations.end(); ++it)
+	{
+		std::cout << "Location path: " << it->path << std::endl;
+		if (mainPath == it->path)
+		{
+			for (std::vector<std::string>::const_iterator it2 = it->allowedMethods.begin(); it2 != it->allowedMethods.end(); ++it2)
+			{
+				if (*it2 == method)
+					return true;
+			}
+		}
+	}
+	return true; // If no location block matches, all methods are allowed by default
 }
 
 int ServerConfig::getPort() const { return this->_port; }

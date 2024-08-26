@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:52:54 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/25 13:28:36 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/26 18:49:08 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,6 +20,7 @@
 #include <cstdlib>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <dirent.h>
 
 #include "status.hpp"
 #include "utils.hpp"

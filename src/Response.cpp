@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/25 13:59:01 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/26 18:51:50 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -473,27 +473,34 @@ StatusCode Response::_handlePOST()
 
 StatusCode Response::_handleDELETE()
 {
-	std::string file;
 	if (this->_requestedPath.empty())
 		return ERROR_400;
-	else if (this->_requestHeaders["Content-Length"].find("Content-Length") != std::string::npos && this->_requestHeaders["Content-Length"] != "0")
-		return ERROR_400;												   // DELETE request should not have a body, if there is present Content-Length header, it should be 0
-	else if (this->_requestedPath[this->_requestedPath.size() - 1] == '/') // If is a directory, we don't allow to delete it
-		return ERROR_403;
-	else
-	{
-		file = this->_config.getRoot() + this->_requestedPath;
-		if (access(file.c_str(), F_OK) != 0) // Check if the file exists
-			return ERROR_404;
-		else if (access(file.c_str(), W_OK) != 0) // Check if the file is writable
-			return ERROR_403;
-		else if (remove(file.c_str()) == 0)
-			return SUCCESS_204;
-		else
-			return ERROR_500;
-	}
+	else if (this->_requestHeaders["Content-Length"].find("Content-Length") != std::string::npos &&
+			 this->_requestHeaders["Content-Length"] != "0")
+		return ERROR_400; // DELETE request should not have a body, if there is present Content-Length header, it should be 0
 
-	return NO_STATUS_CODE; // Impossible to reach this point
+	std::string fullPath = this->_config.getRoot() + this->_requestedPath;
+
+	// Check if it's a directory
+	DIR *dir = opendir(fullPath.c_str());
+	bool isDirectory = (dir != NULL);
+	if (dir)
+		closedir(dir);
+
+	// If it's a directory but doesn't end with '/', append it
+	if (isDirectory && this->_requestedPath[this->_requestedPath.size() - 1] != '/')
+		fullPath += '/';
+
+	if (fullPath[fullPath.size() - 1] == '/') // If is a directory, we don't allow to delete it
+		return ERROR_403;
+	if (access(fullPath.c_str(), F_OK) != 0) // Check if the file exists
+		return ERROR_404;
+	if (access(fullPath.c_str(), W_OK) != 0) // Check if the file is writable
+		return ERROR_403;
+	if (remove(fullPath.c_str()) == 0)
+		return SUCCESS_204;
+
+	return ERROR_500;
 }
 
 const std::string Response::_determineContentType(const std::string &filename) const

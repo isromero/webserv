@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:44:05 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/25 13:45:52 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/26 18:21:41 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -141,7 +141,7 @@ StatusCode Request::_parseRequestLine(size_t &pos, size_t &end)
 	if (methodEnd != std::string::npos && fileStart != std::string::npos && fileEnd != std::string::npos)
 	{
 		this->_method = requestLine.substr(0, methodEnd);
-		if (this->_method != "GET" && this->_method != "POST" && this->_method != "DELETE") // TODO: Change if we add more methods
+		if (this->_method != "GET" && this->_method != "POST" && this->_method != "DELETE") // Only GET, POST and DELETE are supported
 			return ERROR_405;
 
 		std::string version = requestLine.substr(versionStart);
@@ -165,6 +165,9 @@ StatusCode Request::_parseRequestLine(size_t &pos, size_t &end)
 		if (this->_path.find(' ') != std::string::npos || this->_path.empty())
 			return ERROR_400;
 		this->_path = secureFilePath(this->_path);
+
+		if (!this->_config.isMethodAllowed(this->_config.getLocations(), this->_path, this->_method))
+			return ERROR_405;
 	}
 	else if (requestLine.find("HTTP/1.1") == std::string::npos)
 		return ERROR_505;

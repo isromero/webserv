@@ -60,6 +60,8 @@ public:
 	ServerConfig(const ServerConfig &other);
 	~ServerConfig();
 
+	bool isMethodAllowed(const std::vector<LocationConfig> &location, const std::string &path, const std::string &method) const;
+
 	int getPort() const;
 	std::vector<std::string> getServerNames() const;
 	std::string getHost() const;
