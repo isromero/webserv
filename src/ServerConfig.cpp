@@ -34,7 +34,7 @@ static const std::string extractMainPath(const std::string &fullPath)
 	size_t lastSlash = fullPath.find_last_of('/');
 	if (lastSlash == 0)
 		return "/";
-	return fullPath.substr(0, lastSlash);
+	return fullPath.substr(0, lastSlash + 1); // Include the last slash
 }
 
 void ServerConfig::_parseConfigFile(const std::string &filePath)
@@ -264,20 +264,21 @@ void ServerConfig::_parseLocationBlock(const std::string &locationPath, const st
 bool ServerConfig::isMethodAllowed(const std::vector<LocationConfig> &locations, const std::string &path, const std::string &method) const
 {
 	const std::string mainPath = extractMainPath(path);
-	std::cout << "Main path: " << mainPath << std::endl;
 
 	// Find the best match for the path(best match is the longest path that matches the beginning of the request path)
 	// This prevents errors like "/" matching before "/route" when path is "/route"
 	for (std::vector<LocationConfig>::const_iterator it = locations.begin(); it != locations.end(); ++it)
 	{
-		std::cout << "Location path: " << it->path << std::endl;
 		if (mainPath == it->path)
 		{
+			if (it->allowedMethods.empty()) // If no methods are specified in the block, all methods are allowed
+				return true;
 			for (std::vector<std::string>::const_iterator it2 = it->allowedMethods.begin(); it2 != it->allowedMethods.end(); ++it2)
 			{
 				if (*it2 == method)
 					return true;
 			}
+			return false; // If the path matches but the method does not, return false
 		}
 	}
 	return true; // If no location block matches, all methods are allowed by default
