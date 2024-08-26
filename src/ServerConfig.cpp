@@ -284,6 +284,18 @@ bool ServerConfig::isMethodAllowed(const std::vector<LocationConfig> &locations,
 	return true; // If no location block matches, all methods are allowed by default
 }
 
+bool ServerConfig::isAutoindex(const std::vector<LocationConfig> &locations, const std::string &path) const
+{
+	const std::string mainPath = extractMainPath(path);
+
+	for (std::vector<LocationConfig>::const_iterator it = locations.begin(); it != locations.end(); ++it)
+	{
+		if (mainPath == it->path)
+			return it->autoindex;
+	}
+	return false; // If no location block matches, autoindex is off by default
+}
+
 int ServerConfig::getPort() const { return this->_port; }
 std::vector<std::string> ServerConfig::getServerNames() const { return this->_serverNames; }
 std::string ServerConfig::getHost() const { return this->_host; }

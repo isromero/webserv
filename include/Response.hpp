@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:52:54 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/26 18:49:08 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/26 19:47:03 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,6 +21,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <dirent.h>
+#include <sys/stat.h>
 
 #include "status.hpp"
 #include "utils.hpp"
@@ -55,6 +56,7 @@ private:
 	bool _isCGIRequest() const;
 	const std::string _determineContentType(const std::string &filename) const;
 	const std::string _generateHTMLPage(bool isError, const std::string &statusLine, const std::string &body);
+	const std::string _generateDirectoryListing();
 
 public:
 	Response(const std::string &request, const std::string &method, const std::string &requestedPath, const std::map<std::string, std::string> &headers, const std::string &body, const ServerConfig &config);

@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/26 18:51:50 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/26 19:56:03 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -157,8 +157,15 @@ const std::string Response::handleResponse(StatusCode statusCode)
 	}
 	else if (!isError && !this->_isCGIRequest())
 	{
-		if ((statusCode == SUCCESS_200 && this->_method == "GET")) // If it is a success, we determine the content type because we are serving a file
+		bool isDirectoryRequest = this->_requestedPath[this->_requestedPath.size() - 1] == '/';
+		bool isAutoindex = this->_config.isAutoindex(this->_config.getLocations(), this->_requestedPath);
+		if (statusCode == SUCCESS_200 && this->_method == "GET" && !isDirectoryRequest) // If it is a success, we determine the content type because we are serving a file
 			this->_responseHeaders["Content-Type"] = this->_determineContentType(this->_responsePath);
+		else if (isDirectoryRequest && isAutoindex) // If it is a directory request and autoindex is enabled, we generate the directory listing
+		{
+			this->_responseHeaders["Content-Type"] = "text/html";
+			this->_responseBody = this->_generateDirectoryListing();
+		}
 		else
 		{
 			this->_responseHeaders["Content-Type"] = "text/html"; // Other sucess messages we return an HTML page
@@ -336,7 +343,7 @@ StatusCode Response::_handleGET()
 	{
 		std::vector<std::string> indexes = this->_config.getIndexes();
 		if (indexes.empty())
-			this->_responsePath = this->_config.getRoot() + this->_requestedPath; // Serve the directory
+			this->_responsePath = this->_config.getRoot() + this->_requestedPath;
 
 		for (std::vector<std::string>::iterator it = indexes.begin(); it != indexes.end(); ++it)
 		{
@@ -346,8 +353,13 @@ StatusCode Response::_handleGET()
 				break;
 			}
 		}
-		if (this->_responsePath.empty()) // TODO: Check autoindex, if is deactivated and there is no index file, return 403
-			return ERROR_403;
+		if (this->_responsePath.empty()) // If no index file was found
+		{
+			if (this->_config.isAutoindex(this->_config.getLocations(), this->_requestedPath)) // If autoindex is enabled, we generate the index
+				return SUCCESS_200;
+			else
+				return ERROR_403;
+		}
 	}
 	else
 		this->_responsePath = this->_config.getRoot() + this->_requestedPath;
@@ -588,6 +600,63 @@ const std::string Response::_generateHTMLPage(bool isError, const std::string &s
 	responseBody += "<body>\n";
 	responseBody += "<h1>" + status + "</h1>\n";
 	responseBody += "<p>" + body + "</p>\n";
+	responseBody += "</body>\n";
+	responseBody += "</html>\n";
+
+	return responseBody;
+}
+
+const std::string Response::_generateDirectoryListing()
+{
+	DIR *dir;
+	struct dirent *ent;
+	std::string responseBody;
+	std::string path = this->_config.getRoot() + this->_requestedPath;
+
+	responseBody += "<!DOCTYPE html>\n";
+	responseBody += "<html lang=\"en\">\n";
+	responseBody += "<head>\n";
+	responseBody += "<meta charset=\"UTF-8\">\n";
+	responseBody += "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n";
+	responseBody += "<title>Directory Listing - " + this->_requestedPath + "</title>\n";
+	responseBody += "<style>\n";
+	responseBody += "body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }\n";
+	responseBody += "h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }\n";
+	responseBody += "ul { list-style-type: none; padding: 0; }\n";
+	responseBody += "li { margin: 10px 0; background: #f8f9fa; border-radius: 5px; }\n";
+	responseBody += "a { display: block; padding: 10px 15px; color: #2980b9; text-decoration: none; transition: background 0.3s; }\n";
+	responseBody += "a:hover { background: #e9ecef; }\n";
+	responseBody += ".directory { font-weight: bold; }\n";
+	responseBody += ".file { }\n";
+	responseBody += "</style>\n";
+	responseBody += "</head>\n";
+	responseBody += "<body>\n";
+	responseBody += "<h1>Directory Listing: " + this->_requestedPath + "</h1>\n";
+	responseBody += "<ul>\n";
+
+	if ((dir = opendir(path.c_str())) != NULL)
+	{
+		while ((ent = readdir(dir)) != NULL)
+		{
+			std::string fileName = std::string(ent->d_name);
+			std::string fullPath = path + "/" + fileName;
+			struct stat fileStat;
+
+			if (stat(fullPath.c_str(), &fileStat) == 0)
+			{
+				std::string fileClass = S_ISDIR(fileStat.st_mode) ? "directory" : "file";
+				std::string href = fileName;
+				if (S_ISDIR(fileStat.st_mode) && fileName != "." && fileName != "..") // If it is a directory, we add a slash at the end
+					href += "/";
+				responseBody += "<li class=\"" + fileClass + "\"><a href=\"" + href + "\">" + fileName + "</a></li>\n";
+			}
+		}
+		closedir(dir);
+	}
+	else
+		responseBody += "<li>Error reading directory</li>\n";
+
+	responseBody += "</ul>\n";
 	responseBody += "</body>\n";
 	responseBody += "</html>\n";
 

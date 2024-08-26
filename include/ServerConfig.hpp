@@ -61,6 +61,7 @@ public:
 	~ServerConfig();
 
 	bool isMethodAllowed(const std::vector<LocationConfig> &location, const std::string &path, const std::string &method) const;
+	bool isAutoindex(const std::vector<LocationConfig> &location, const std::string &path) const;
 
 	int getPort() const;
 	std::vector<std::string> getServerNames() const;
