@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/27 19:27:20 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/27 20:08:02 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -47,7 +47,7 @@ const std::string Response::handleResponse(StatusCode statusCode)
 	{
 	case SUCCESS_200:
 		statusLine = "HTTP/1.1 200 OK";
-		if (this->_method == "GET")
+		if (this->_method == "GET" && this->_hasIndexFileInResponse())
 			this->_responseBody = readFile(this->_responsePath);
 		break;
 	case SUCCESS_201:
@@ -56,6 +56,10 @@ const std::string Response::handleResponse(StatusCode statusCode)
 		break;
 	case SUCCESS_204:
 		statusLine = "HTTP/1.1 204 No Content"; // No body if no content
+		break;
+	case REDIRECTION_301:
+		statusLine = "HTTP/1.1 301 Moved Permanently";
+		this->_responseBody = "The requested resource has been assigned a new permanent URI.";
 		break;
 	case ERROR_400:
 		statusLine = "HTTP/1.1 400 Bad Request";
@@ -152,7 +156,8 @@ const std::string Response::handleResponse(StatusCode statusCode)
 		}
 	}
 
-	// Build the location header (We just inform to the client, but we don't use redirects, just 201 created)
+	// Build the location header (For POST 201 created and GET redirection 301)
+	// For POST 201 the location header is where the new resource is located just for info/testing purposes
 	if (this->_locationHeader != "")
 		this->_responseHeaders["Location"] = this->_locationHeader;
 
@@ -176,9 +181,9 @@ const std::string Response::handleResponse(StatusCode statusCode)
 	{
 		bool isDirectoryRequest = this->_requestedPath[this->_requestedPath.size() - 1] == '/';
 		bool isAutoindex = this->_config.isAutoindex(this->_config.getLocations(), this->_requestedPath);
-		if (statusCode == SUCCESS_200 && this->_method == "GET" && this->_hasIndexFileInRequestedPath()) // If it is a success, we determine the content type because we are serving a file
+		if (statusCode == SUCCESS_200 && this->_method == "GET" && this->_hasIndexFileInResponse()) // If it is a success, we determine the content type because we are serving a file
 			this->_responseHeaders["Content-Type"] = this->_determineContentType(this->_responsePath);
-		else if (isDirectoryRequest && isAutoindex && !this->_hasIndexFileInRequestedPath()) // If it is a directory request, autoindex is enabled and there is no index file we generate the directory listing
+		else if (isDirectoryRequest && isAutoindex && !this->_hasIndexFileInResponse()) // If it is a directory request, autoindex is enabled and there is no index file we generate the directory listing
 		{
 			this->_responseHeaders["Content-Type"] = "text/html";
 			this->_responseBody = this->_generateDirectoryListing();
@@ -356,7 +361,13 @@ StatusCode Response::_handleCGI()
 
 StatusCode Response::_handleGET()
 {
-	if (this->_requestedPath[this->_requestedPath.size() - 1] == '/') // If is a directory just serve the index file in the server config
+	std::string redirect = this->_config.getRedirect(this->_requestedPath);
+	if (redirect != "")
+	{
+		this->_locationHeader = redirect;
+		return REDIRECTION_301;
+	}
+	else if (this->_requestedPath[this->_requestedPath.size() - 1] == '/') // If is a directory just serve the index file in the server config
 	{
 		std::vector<std::string> indexes = this->_config.getIndexes();
 		if (indexes.empty())
@@ -436,7 +447,7 @@ StatusCode Response::_handlePOST()
 						std::string savedPath;
 						if (this->_saveFile(content, filename, savedPath))
 						{
-							this->_locationHeader = savedPath;
+							this->_locationHeader = savedPath; // We return where we saved the file but just for info/testing purposes
 							fileUploaded = true;
 						}
 						else
