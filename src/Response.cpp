@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/26 19:56:03 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/27 19:27:20 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,6 +19,23 @@ Response::Response(const std::string &request, const std::string &method, const 
 
 Response::~Response()
 {
+}
+
+bool Response::_saveFile(const std::string &content, const std::string &filename, std::string &savedPath)
+{
+	std::string uploadDir = this->_config.getUploadDir(this->_requestedPath);
+	if (uploadDir[uploadDir.size() - 1] != '/')
+		uploadDir += "/";
+	std::string filepath = uploadDir + getFilenameAndDate(filename);
+	std::ofstream file(filepath.c_str(), std::ios::binary);
+	if (file.is_open())
+	{
+		file.write(content.c_str(), content.size());
+		file.close();
+		savedPath = filepath;
+		return true;
+	}
+	return false;
 }
 
 const std::string Response::handleResponse(StatusCode statusCode)
@@ -159,9 +176,9 @@ const std::string Response::handleResponse(StatusCode statusCode)
 	{
 		bool isDirectoryRequest = this->_requestedPath[this->_requestedPath.size() - 1] == '/';
 		bool isAutoindex = this->_config.isAutoindex(this->_config.getLocations(), this->_requestedPath);
-		if (statusCode == SUCCESS_200 && this->_method == "GET" && !isDirectoryRequest) // If it is a success, we determine the content type because we are serving a file
+		if (statusCode == SUCCESS_200 && this->_method == "GET" && this->_hasIndexFileInRequestedPath()) // If it is a success, we determine the content type because we are serving a file
 			this->_responseHeaders["Content-Type"] = this->_determineContentType(this->_responsePath);
-		else if (isDirectoryRequest && isAutoindex) // If it is a directory request and autoindex is enabled, we generate the directory listing
+		else if (isDirectoryRequest && isAutoindex && !this->_hasIndexFileInRequestedPath()) // If it is a directory request, autoindex is enabled and there is no index file we generate the directory listing
 		{
 			this->_responseHeaders["Content-Type"] = "text/html";
 			this->_responseBody = this->_generateDirectoryListing();
@@ -355,7 +372,7 @@ StatusCode Response::_handleGET()
 		}
 		if (this->_responsePath.empty()) // If no index file was found
 		{
-			if (this->_config.isAutoindex(this->_config.getLocations(), this->_requestedPath)) // If autoindex is enabled, we generate the index
+			if (this->_config.isAutoindex(this->_config.getLocations(), this->_requestedPath)) // If autoindex is enabled, we generate the directory listing
 				return SUCCESS_200;
 			else
 				return ERROR_403;
@@ -417,7 +434,7 @@ StatusCode Response::_handlePOST()
 					{
 						std::string content = part.substr(contentStart + 4);
 						std::string savedPath;
-						if (saveFile(content, filename, savedPath))
+						if (this->_saveFile(content, filename, savedPath))
 						{
 							this->_locationHeader = savedPath;
 							fileUploaded = true;
@@ -661,4 +678,12 @@ const std::string Response::_generateDirectoryListing()
 	responseBody += "</html>\n";
 
 	return responseBody;
+}
+
+bool Response::_hasIndexFileInResponse() const
+{
+	// It will be a index file if exists in the response path because we checked it in handleGET
+	if (access((this->_responsePath).c_str(), F_OK) == 0)
+		return true;
+	return false;
 }

@@ -296,6 +296,18 @@ bool ServerConfig::isAutoindex(const std::vector<LocationConfig> &locations, con
 	return false; // If no location block matches, autoindex is off by default
 }
 
+const std::string ServerConfig::getUploadDir(const std::string &path) const
+{
+	const std::string mainPath = extractMainPath(path);
+
+	for (std::vector<LocationConfig>::const_iterator it = this->_locations.begin(); it != this->_locations.end(); ++it)
+	{
+		if (mainPath == it->path)
+			return it->uploadDir;
+	}
+	return "/var/www/uploads"; // If no location block matches, return the default upload directory
+}
+
 int ServerConfig::getPort() const { return this->_port; }
 std::vector<std::string> ServerConfig::getServerNames() const { return this->_serverNames; }
 std::string ServerConfig::getHost() const { return this->_host; }

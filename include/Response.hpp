@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:52:54 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/26 19:47:03 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/27 19:26:22 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -57,6 +57,8 @@ private:
 	const std::string _determineContentType(const std::string &filename) const;
 	const std::string _generateHTMLPage(bool isError, const std::string &statusLine, const std::string &body);
 	const std::string _generateDirectoryListing();
+	bool _saveFile(const std::string &content, const std::string &filename, std::string &savedPath);
+	bool _hasIndexFileInResponse() const;
 
 public:
 	Response(const std::string &request, const std::string &method, const std::string &requestedPath, const std::map<std::string, std::string> &headers, const std::string &body, const ServerConfig &config);
