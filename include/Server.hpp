@@ -13,16 +13,12 @@
 #ifndef SERVER_HPP
 #define SERVER_HPP
 
-#include <iostream>
-#include <string>
-#include <unistd.h>
-#include <fstream>
-#include <sstream>
-#include <cerrno>
-#include <cstring>
-#include <fcntl.h>
-#include <cstdlib>
-#include <map>
+#include "includes.hpp"
+#include "ServerConfig.hpp"
+#include "Socket.hpp"
+#include "Request.hpp"
+#include "Response.hpp"
+#include "status.hpp"
 
 #if defined(__linux__)
 #include <sys/epoll.h>
@@ -31,13 +27,6 @@
 #endif
 
 #define MAX_EVENTS 10000
-
-#include "status.hpp"
-#include "utils.hpp"
-#include "Socket.hpp"
-#include "Request.hpp"
-#include "Response.hpp"
-#include "ServerConfig.hpp"
 
 class Server
 {

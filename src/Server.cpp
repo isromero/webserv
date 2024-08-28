@@ -16,43 +16,6 @@ Server::Server() : _config("var/www/config/default.conf"), _socket(_config)
 {
 	try
 	{
-		int port = this->_config.getPort();
-		std::cout << "Port: " << port << std::endl;
-
-		std::vector<std::string> serverNames = this->_config.getServerNames();
-		for (std::vector<std::string>::const_iterator it = serverNames.begin(); it != serverNames.end(); ++it)
-			std::cout << "Server name: " << *it << std::endl;
-
-		std::string host = this->_config.getHost();
-		std::cout << "Host: " << host << std::endl;
-
-		std::string root = this->_config.getRoot();
-		std::cout << "Root: " << root << std::endl;
-
-		std::vector<std::string> indexes = this->_config.getIndexes();
-		for (std::vector<std::string>::const_iterator it = indexes.begin(); it != indexes.end(); ++it)
-			std::cout << "Index: " << *it << std::endl;
-
-		size_t clientMaxBodySize = this->_config.getClientMaxBodySize();
-		std::cout << "Client max body size: " << clientMaxBodySize << std::endl;
-
-		std::map<int, std::string> errorPages = this->_config.getErrorPages();
-		for (std::map<int, std::string>::const_iterator it = errorPages.begin(); it != errorPages.end(); ++it)
-			std::cout << "Error page: " << it->first << " " << it->second << std::endl;
-
-		std::vector<LocationConfig> locations = this->_config.getLocations();
-		for (std::vector<LocationConfig>::const_iterator it = locations.begin(); it != locations.end(); ++it)
-		{
-			std::cout << "Location path: " << it->path << std::endl;
-			std::vector<std::string> allowedMethods = it->allowedMethods;
-			for (std::vector<std::string>::const_iterator it2 = allowedMethods.begin(); it2 != allowedMethods.end(); ++it2)
-				std::cout << "Allowed method: " << *it2 << std::endl;
-			std::cout << "Autoindex: " << it->autoindex << std::endl;
-			std::cout << "Upload dir: " << it->uploadDir << std::endl;
-			std::cout << "CGI extension: " << it->cgiExtension << std::endl;
-			std::cout << "CGI bin: " << it->cgiBin << std::endl;
-			std::cout << "Redirect: " << it->redirect << std::endl;
-		}
 		this->_socket.init();
 	}
 	catch (const std::exception &e)

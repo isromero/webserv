@@ -6,22 +6,14 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:29:19 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/27 18:55:31 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/28 18:54:15 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
-#include <iostream>
-#include <string>
-#include <sstream>
-#include <cerrno>
-#include <fstream>
-#include <cstring>
-#include <ctime>
-#include <iomanip>
-#include <cctype>
+#include "includes.hpp"
 
 std::string secureFilePath(const std::string &path);
 std::string readFile(const std::string &filename);

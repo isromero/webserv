@@ -6,26 +6,17 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:52:54 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/27 19:26:22 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/28 19:02:21 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef RESPONSE_HPP
 #define RESPONSE_HPP
 
-#include <iostream>
-#include <string>
-#include <map>
-#include <unistd.h>
-#include <cstdlib>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <dirent.h>
-#include <sys/stat.h>
-
+#include "includes.hpp"
+#include "ServerConfig.hpp"
 #include "status.hpp"
 #include "utils.hpp"
-#include "ServerConfig.hpp"
 
 #if defined(__APPLE__)
 extern char **environ;

@@ -13,19 +13,7 @@
 #ifndef SERVERCONFIG_HPP
 #define SERVERCONFIG_HPP
 
-#include <iostream>
-#include <string>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <cerrno>
-#include <cstring>
-#include <fstream>
-#include <sstream>
-#include <string>
-#include <vector>
-#include <map>
-
+#include "includes.hpp"
 #include "utils.hpp"
 
 struct LocationConfig

@@ -6,25 +6,17 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:42:12 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/25 13:29:31 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/28 19:01:56 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef REQUEST_HPP
 #define REQUEST_HPP
 
-#include <iostream>
-#include <string>
-#include <map>
-#include <sstream>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <cstring>
-#include <cstdlib>
-
+#include "includes.hpp"
+#include "ServerConfig.hpp"
 #include "status.hpp"
 #include "utils.hpp"
-#include "ServerConfig.hpp"
 
 class Request
 {
