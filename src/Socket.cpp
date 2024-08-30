@@ -6,13 +6,13 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 12:21:58 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/25 12:07:56 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/30 18:22:30 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Socket.hpp"
 
-Socket::Socket(ServerConfig config) : _config(config), _serverfd(-1) {}
+Socket::Socket(GlobalConfig config) : _globalConfig(config), _serverfd(-1) {}
 
 Socket::~Socket()
 {
@@ -44,15 +44,8 @@ void Socket::_bindSocket()
 	struct sockaddr_in serverAddress;
 	memset(&serverAddress, 0, sizeof(serverAddress)); // Good practice
 	serverAddress.sin_family = AF_INET;
-	serverAddress.sin_port = htons(this->_config.getPort()); // htons converts the port number to network byte order
-
-	std::string host = this->_config.getHost();
-	if (host == "0.0.0.0")
-		serverAddress.sin_addr.s_addr = INADDR_ANY; // Listen in any address
-	else if (host == "localhost" || host == "127.0.0.1")
-		serverAddress.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // Listen in localhost
-	else
-		serverAddress.sin_addr.s_addr = inet_addr(host.c_str());
+	serverAddress.sin_port = htons(this->_globalConfig.getMainPort()); // htons converts the port number to network byte order
+	serverAddress.sin_addr.s_addr = INADDR_ANY;						   // Accept connections from any IP address
 
 	// Bind the socket to the address and port
 	if (bind(this->_serverfd, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) == -1)

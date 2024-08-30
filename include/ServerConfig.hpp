@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ServerConfig.hpp                                   :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: adgutier <adgutier@student.42madrid.com    +#+  +:+       +#+        */
+/*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2024/08/18 18:19:00 by adgutier          #+#    #+#             */
-/*   Updated: 2024/08/18 18:19:00 by adgutier         ###   ########.fr       */
+/*   Created: 2024/08/28 20:01:32 by isromero          #+#    #+#             */
+/*   Updated: 2024/08/28 20:01:32 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -39,19 +39,24 @@ private:
 	std::map<int, std::string> _errorPages;
 	std::vector<LocationConfig> _locations;
 
-	void _parseConfigFile(const std::string &filePath);
-	void _parseServerParameters(const std::string &param, std::string &value);
-	void _parseLocationBlock(const std::string &locationPath, const std::vector<std::string> &locationBlock);
-
 public:
-	ServerConfig(const std::string &configFilePath);
-	ServerConfig(const ServerConfig &other);
+	ServerConfig();
+	ServerConfig &operator=(const ServerConfig &other);
 	~ServerConfig();
 
 	bool isMethodAllowed(const std::vector<LocationConfig> &location, const std::string &path, const std::string &method) const;
 	bool isAutoindex(const std::vector<LocationConfig> &location, const std::string &path) const;
 	const std::string getUploadDir(const std::string &path) const;
 	const std::string getRedirect(const std::string &path) const;
+
+	void setPort(int port);
+	void addServerName(const std::string &serverName);
+	void setHost(const std::string &host);
+	void setRoot(const std::string &root);
+	void addIndex(const std::string &index);
+	void setClientMaxBodySize(size_t clientMaxBodySize);
+	void addErrorPage(int errorCode, const std::string &errorPage);
+	void addLocation(const LocationConfig &location);
 
 	int getPort() const;
 	std::vector<std::string> getServerNames() const;

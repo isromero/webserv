@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:29:36 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/27 18:55:21 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/28 20:01:55 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -101,4 +101,12 @@ void trimTabs(std::string &s) // Remove leading and trailing tabs
 	while (rit != s.rend() && *rit == '\t')
 		++rit;
 	s.erase(rit.base(), s.end());
+}
+
+const std::string extractMainPath(const std::string &fullPath)
+{
+	size_t lastSlash = fullPath.find_last_of('/');
+	if (lastSlash == 0)
+		return "/";
+	return fullPath.substr(0, lastSlash + 1); // Include the last slash
 }

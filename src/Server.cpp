@@ -12,7 +12,7 @@
 
 #include "Server.hpp"
 
-Server::Server() : _config("var/www/config/default.conf"), _socket(_config)
+Server::Server() : _globalConfig("var/www/config/default.conf"), _socket(_globalConfig)
 {
 	try
 	{
@@ -25,13 +25,10 @@ Server::Server() : _config("var/www/config/default.conf"), _socket(_config)
 	}
 }
 
-Server::Server(const std::string &configFilePath) : _config(configFilePath), _socket(_config)
+Server::Server(const std::string &configFilePath) : _globalConfig(configFilePath), _socket(_globalConfig)
 {
 	try
 	{
-		std::vector<std::string> serverNames = this->_config.getServerNames();
-		for (std::vector<std::string>::const_iterator it = serverNames.begin(); it != serverNames.end(); ++it)
-			std::cout << "Server name: " << *it << std::endl;
 		this->_socket.init();
 	}
 	catch (const std::exception &e)
@@ -41,13 +38,13 @@ Server::Server(const std::string &configFilePath) : _config(configFilePath), _so
 	}
 }
 
-Server::Server(const Server &other) : _config(other._config), _socket(other._socket) {}
+Server::Server(const Server &other) : _globalConfig(other._globalConfig), _socket(other._socket) {}
 
 Server &Server::operator=(const Server &other)
 {
 	if (this != &other)
 	{
-		this->_config = other._config;
+		this->_globalConfig = other._globalConfig;
 		this->_socket = other._socket;
 	}
 	return *this;
@@ -200,13 +197,44 @@ int Server::_acceptClient()
 	return clientfd;
 }
 
+static std::pair<std::string, int> getHostInfo(int clientfd)
+{
+	char buffer[1024];
+	ssize_t bytesRead = recv(clientfd, buffer, sizeof(buffer) - 1, MSG_PEEK); // MSG_PEEK flag reads the data without removing it from the queue
+	if (bytesRead > 0)
+	{
+		buffer[bytesRead] = '\0';
+		std::string headers(buffer);
+		size_t endOfHeaders = headers.find("\r\n\r\n");
+		if (endOfHeaders != std::string::npos)
+		{
+			headers = headers.substr(0, endOfHeaders);
+			size_t hostPos = headers.find("Host: ");
+			if (hostPos != std::string::npos)
+			{
+				size_t endOfHost = headers.find("\r\n", hostPos);
+				std::string hostLine = headers.substr(hostPos + 6, endOfHost - (hostPos + 6));
+				size_t colonPos = hostLine.find(':');
+				if (colonPos != std::string::npos)
+					return std::make_pair(hostLine.substr(0, colonPos), std::atoi(hostLine.substr(colonPos + 1).c_str()));
+				else
+					return std::make_pair(hostLine, 6969);
+			}
+		}
+	}
+	return std::make_pair("localhost", 6969); // Default host and port
+}
+
 std::string Server::_processRequestResponse(int clientfd)
 {
-	Request request(clientfd, this->_config);
+	// Get the configuration matching the host and port, if not found, use the default one
+	std::pair<std::string, int> hostInfo = getHostInfo(clientfd);
+	const ServerConfig &config = this->_globalConfig.getServerConfig(hostInfo.first, hostInfo.second);
 
+	Request request(clientfd, config);
 	StatusCode statusCode = request.parseRequest();
 	std::cout << request.getRequest() << std::endl;
-	Response response(request.getRequest(), request.getMethod(), request.getPath(), request.getHeaders(), request.getBody(), this->_config);
+	Response response(request.getRequest(), request.getMethod(), request.getPath(), request.getHeaders(), request.getBody(), config);
 	if (statusCode != NO_STATUS_CODE)
 		return response.handleResponse(statusCode);
 

@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/28 18:51:01 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/30 18:51:55 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -385,8 +385,10 @@ StatusCode Response::_handleGET()
 		{
 			if (this->_config.isAutoindex(this->_config.getLocations(), this->_requestedPath)) // If autoindex is enabled, we generate the directory listing
 				return SUCCESS_200;
+			if (access((this->_config.getRoot() + this->_requestedPath).c_str(), F_OK) != 0) // Check if the directory exists
+				return ERROR_404;
 			else
-				return ERROR_403;
+				return ERROR_403; // If the directory exists but there is no index file and autoindex is disabled, is forbidden
 		}
 	}
 	else
@@ -531,10 +533,10 @@ StatusCode Response::_handleDELETE()
 	if (isDirectory && this->_requestedPath[this->_requestedPath.size() - 1] != '/')
 		fullPath += '/';
 
-	if (fullPath[fullPath.size() - 1] == '/') // If is a directory, we don't allow to delete it
-		return ERROR_403;
 	if (access(fullPath.c_str(), F_OK) != 0) // Check if the file exists
 		return ERROR_404;
+	if (fullPath[fullPath.size() - 1] == '/') // If is a directory, we don't allow to delete it
+		return ERROR_403;
 	if (access(fullPath.c_str(), W_OK) != 0) // Check if the file is writable
 		return ERROR_403;
 	if (remove(fullPath.c_str()) == 0)

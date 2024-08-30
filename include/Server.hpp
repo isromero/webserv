@@ -14,7 +14,7 @@
 #define SERVER_HPP
 
 #include "includes.hpp"
-#include "ServerConfig.hpp"
+#include "GlobalConfig.hpp"
 #include "Socket.hpp"
 #include "Request.hpp"
 #include "Response.hpp"
@@ -31,7 +31,7 @@
 class Server
 {
 private:
-	ServerConfig _config;
+	GlobalConfig _globalConfig;
 	Socket _socket;
 
 	int _acceptClient();
