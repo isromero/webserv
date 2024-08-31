@@ -6,11 +6,15 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/30 18:51:55 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/31 12:33:54 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Response.hpp"
+
+Response::Response() : _response(""), _request(""), _method(""), _requestedPath(""), _requestHeaders(), _requestBody(""), _responseHeaders(), _responseBody(""), _responsePath(""), _locationHeader(""), _cgiHeaders(), _cgiBody(""), _config()
+{
+}
 
 Response::Response(const std::string &request, const std::string &method, const std::string &requestedPath, const std::map<std::string, std::string> &headers, const std::string &body, const ServerConfig &config)
 	: _response(""), _request(request), _method(method), _requestedPath(requestedPath), _requestHeaders(headers), _requestBody(body), _responseHeaders(), _responseBody(""), _responsePath(""), _locationHeader(""), _cgiHeaders(), _cgiBody(""), _config(config)

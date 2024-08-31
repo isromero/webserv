@@ -227,14 +227,24 @@ static std::pair<std::string, int> getHostInfo(int clientfd)
 
 std::string Server::_processRequestResponse(int clientfd)
 {
-	// Get the configuration matching the host and port, if not found, use the default one
-	std::pair<std::string, int> hostInfo = getHostInfo(clientfd);
-	const ServerConfig &config = this->_globalConfig.getServerConfig(hostInfo.first, hostInfo.second);
+	StatusCode statusCode = NO_STATUS_CODE;
 
-	Request request(clientfd, config);
-	StatusCode statusCode = request.parseRequest();
+	std::pair<std::string, int>
+		hostInfo = getHostInfo(clientfd);											   // Get the host and port from the request
+	std::pair<std::string, int> destInfo = this->_socket.getDestinationInfo(clientfd); // Get the IP and port of the destination for choose the server block because we create only one Socket for all the server blocks
+
+	const std::pair<bool, ServerConfig> config = this->_globalConfig.getServerConfig(hostInfo, destInfo);
+	if (!config.first) // No server block found for the host
+	{
+		statusCode = ERROR_400;
+		Response response;
+		return response.handleResponse(statusCode);
+	}
+
+	Request request(clientfd, config.second);
+	statusCode = request.parseRequest();
 	std::cout << request.getRequest() << std::endl;
-	Response response(request.getRequest(), request.getMethod(), request.getPath(), request.getHeaders(), request.getBody(), config);
+	Response response(request.getRequest(), request.getMethod(), request.getPath(), request.getHeaders(), request.getBody(), config.second);
 	if (statusCode != NO_STATUS_CODE)
 		return response.handleResponse(statusCode);
 

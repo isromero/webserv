@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 12:20:23 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/30 18:18:45 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/31 12:16:10 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -34,6 +34,7 @@ public:
 	~Socket();
 
 	void init();
+	std::pair<std::string, int> getDestinationInfo(int clientfd);
 	int getServerFd() const;
 };
 

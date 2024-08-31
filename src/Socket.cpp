@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 12:21:58 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/30 18:22:30 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/31 12:16:30 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -45,7 +45,7 @@ void Socket::_bindSocket()
 	memset(&serverAddress, 0, sizeof(serverAddress)); // Good practice
 	serverAddress.sin_family = AF_INET;
 	serverAddress.sin_port = htons(this->_globalConfig.getMainPort()); // htons converts the port number to network byte order
-	serverAddress.sin_addr.s_addr = INADDR_ANY;						   // Accept connections from any IP address
+	serverAddress.sin_addr.s_addr = INADDR_ANY;						   // ! We accept connections from any IP BUT then the server choose the configs of the server blocks that match the host
 
 	// Bind the socket to the address and port
 	if (bind(this->_serverfd, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) == -1)
@@ -65,6 +65,22 @@ void Socket::init()
 	this->_configureSocket();
 	this->_bindSocket();
 	this->_listenSocket();
+}
+
+// Get the IP and port of the destination for choose the server block because we create only one Socket for all the server blocks
+std::pair<std::string, int> Socket::getDestinationInfo(int clientfd)
+{
+	struct sockaddr_in clientAddress;
+	socklen_t clientAddressSize = sizeof(clientAddress);
+
+	if (getsockname(clientfd, (struct sockaddr *)&clientAddress, &clientAddressSize) == -1)
+		throw std::runtime_error("Error: getting the destination info: " + std::string(strerror(errno)));
+
+	char destIP[INET_ADDRSTRLEN];
+	if (inet_ntop(AF_INET, &(clientAddress.sin_addr), destIP, INET_ADDRSTRLEN) == NULL) // Convert the IP address to a string and store it in destIP (INET_ADDRSTRLEN is the max length of the string)
+		throw std::runtime_error("Error: converting the IP address to a string: " + std::string(strerror(errno)));
+
+	return std::make_pair(std::string(destIP), ntohs(clientAddress.sin_port));
 }
 
 int Socket::getServerFd() const

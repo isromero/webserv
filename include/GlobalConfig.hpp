@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/28 19:19:30 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/30 18:22:48 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/31 12:42:31 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,12 +30,8 @@ public:
 	GlobalConfig(const std::string &configFilePath);
 	~GlobalConfig();
 
-	bool isMethodAllowed(const std::string &host, int port, const std::string &path, const std::string &method) const;
-	bool isAutoindex(const std::string &host, int port, const std::string &path) const;
-	const std::string getUploadDir(const std::string &host, int port, const std::string &path) const;
-	const std::string getRedirect(const std::string &host, int port, const std::string &path) const;
 	int getMainPort() const;
-	const ServerConfig &getServerConfig(const std::string &host, int port) const;
+	const std::pair<bool, ServerConfig> getServerConfig(const std::pair<std::string, int> &hostInfo, const std::pair<std::string, int> &destInfo) const;
 };
 
 #endif

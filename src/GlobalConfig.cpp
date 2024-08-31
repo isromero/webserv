@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/28 19:20:21 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/30 18:48:00 by isromero         ###   ########.fr       */
+/*   Updated: 2024/08/31 12:54:33 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -260,30 +260,6 @@ void GlobalConfig::_parseLocationBlock(ServerConfig &currentServer, const std::s
 	currentServer.addLocation(location);
 }
 
-bool GlobalConfig::isMethodAllowed(const std::string &host, int port, const std::string &path, const std::string &method) const
-{
-	const ServerConfig &server = getServerConfig(host, port);
-	return server.isMethodAllowed(server.getLocations(), path, method);
-}
-
-bool GlobalConfig::isAutoindex(const std::string &host, int port, const std::string &path) const
-{
-	const ServerConfig &server = getServerConfig(host, port);
-	return server.isAutoindex(server.getLocations(), path);
-}
-
-const std::string GlobalConfig::getUploadDir(const std::string &host, int port, const std::string &path) const
-{
-	const ServerConfig &server = getServerConfig(host, port);
-	return server.getUploadDir(path);
-}
-
-const std::string GlobalConfig::getRedirect(const std::string &host, int port, const std::string &path) const
-{
-	const ServerConfig &server = getServerConfig(host, port);
-	return server.getRedirect(path);
-}
-
 int GlobalConfig::getMainPort() const
 {
 	if (!this->_servers.empty())
@@ -292,28 +268,40 @@ int GlobalConfig::getMainPort() const
 		return 6969; // Default port
 }
 
-const ServerConfig &GlobalConfig::getServerConfig(const std::string &host, int port) const
+const std::pair<bool, ServerConfig> GlobalConfig::getServerConfig(const std::pair<std::string, int> &hostInfo, const std::pair<std::string, int> &destInfo) const
 {
-	const ServerConfig *defaultServer = NULL;
+	ServerConfig defaultServer;
+	bool found = false;
 
 	for (std::vector<ServerConfig>::const_iterator it = this->_servers.begin(); it != this->_servers.end(); ++it)
 	{
-		if (it->getServerNames().empty())
+		std::cout << "Host: " << hostInfo.first << " Port: " << hostInfo.second << std::endl;
+		std::cout << "Dest: " << destInfo.first << " Port: " << destInfo.second << std::endl;
+
+		std::cout << "Server: " << it->getHost() << " Port: " << it->getPort() << std::endl;
+		if (it->getPort() != destInfo.second) // It's not the server for this port
+			continue;
+
+		if (it->getHost() != "0.0.0.0" && it->getHost() != destInfo.first) // It's not the server for this host
+			continue;
+
+			if (it->getServerNames().empty())
 		{
-			defaultServer = &(*it); // Guardar el servidor predeterminado para este puerto si no hay nombres de servidor
+			defaultServer = *it; // Save the default server for this port
+			found = true;
 			continue;
 		}
 
 		const std::vector<std::string> &serverNames = it->getServerNames();
 		for (std::vector<std::string>::const_iterator it2 = serverNames.begin(); it2 != serverNames.end(); ++it2)
 		{
-			if (*it2 == host && it->getPort() == port) // Coincide el nombre del servidor y el puerto con la solicitud
-				return *it;
+			if (*it2 == hostInfo.first)
+				return std::make_pair(true, *it);
 		}
 	}
 
-	if (defaultServer)
-		return *defaultServer; // Usar el servidor predeterminado para este puerto
+	if (found)
+		return std::make_pair(true, defaultServer);
 
-	throw std::runtime_error("No server configuration found for the request");
+	return std::make_pair(false, defaultServer);
 }
