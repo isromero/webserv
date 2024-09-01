@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/28 19:19:30 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/31 12:42:31 by isromero         ###   ########.fr       */
+/*   Updated: 2024/09/01 17:23:03 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,8 +30,8 @@ public:
 	GlobalConfig(const std::string &configFilePath);
 	~GlobalConfig();
 
-	int getMainPort() const;
 	const std::pair<bool, ServerConfig> getServerConfig(const std::pair<std::string, int> &hostInfo, const std::pair<std::string, int> &destInfo) const;
+	const std::vector<ServerConfig> &getServers() const;
 };
 
 #endif

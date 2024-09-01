@@ -16,7 +16,7 @@ Server::Server() : _globalConfig("var/www/config/default.conf"), _socket(_global
 {
 	try
 	{
-		this->_socket.init();
+		this->_socket.createSockets();
 	}
 	catch (const std::exception &e)
 	{
@@ -29,7 +29,7 @@ Server::Server(const std::string &configFilePath) : _globalConfig(configFilePath
 {
 	try
 	{
-		this->_socket.init();
+		this->_socket.createSockets();
 	}
 	catch (const std::exception &e)
 	{
@@ -55,7 +55,7 @@ Server::~Server() {}
 #if defined(__linux__)
 void Server::runLinux()
 {
-	int serverfd = this->_socket.getServerFd();
+	std::vector<int> serverfds = this->_socket.getServerFds();
 
 	// Create the epoll instance
 	int epollfd = epoll_create1(0);
@@ -66,23 +66,28 @@ void Server::runLinux()
 	}
 
 	struct epoll_event event, events[MAX_EVENTS];
-	memset(&event, 0, sizeof(event));
-	event.events = EPOLLIN;
-	event.data.fd = serverfd;
-	if (epoll_ctl(epollfd, EPOLL_CTL_ADD, serverfd, &event) == -1)
+
+	// Add all server sockets to the epoll instance
+	for (std::vector<int>::const_iterator it = serverfds.begin(); it != serverfds.end(); ++it)
 	{
-		std::cerr << "Error: adding the server socket to the epoll instance: " << strerror(errno) << std::endl;
-		close(epollfd);
-		exit(EXIT_FAILURE);
+		memset(&event, 0, sizeof(event));
+		event.events = EPOLLIN;
+		event.data.fd = *it;
+		if (epoll_ctl(epollfd, EPOLL_CTL_ADD, *it, &event) == -1)
+		{
+			std::cerr << "Error: adding server socket to the epoll instance: " << strerror(errno) << std::endl;
+			close(epollfd);
+			exit(EXIT_FAILURE);
+		}
 	}
 
-	std::cout << "Server is running on port 6969..." << std::endl
+	std::cout << "Server running..." << std::endl
 			  << std::endl;
 
 	// Main loop
 	while (1)
 	{
-		int nevents = epoll_wait(epollfd, events, MAX_EVENTS, 0); // 0 means that epoll_wait will return immediately(Non-blocking)
+		int nevents = epoll_wait(epollfd, events, MAX_EVENTS, -1);
 		if (nevents == -1)
 		{
 			std::cerr << "Error: waiting for events: " << strerror(errno) << std::endl;
@@ -92,21 +97,33 @@ void Server::runLinux()
 
 		for (int i = 0; i < nevents; i++)
 		{
-			if (events[i].data.fd == serverfd)
+			bool isServerSocket = false;
+			for (std::vector<int>::const_iterator it = serverfds.begin(); it != serverfds.end(); ++it)
 			{
-				int clientfd = this->_acceptClient();
-				// Add the client socket to the epoll instance
-				memset(&event, 0, sizeof(event));
-				event.events = EPOLLIN;
-				event.data.fd = clientfd;
-				if (epoll_ctl(epollfd, EPOLL_CTL_ADD, clientfd, &event) == -1)
+				if (events[i].data.fd == *it)
 				{
-					std::cerr << "Error: adding the client socket to the epoll instance: " << strerror(errno) << std::endl;
-					close(clientfd);
-					continue;
+					isServerSocket = true;
+					break;
 				}
 			}
-			else
+
+			if (isServerSocket)
+			{
+				int clientfd = this->_acceptClient(events[i].data.fd);
+				if (clientfd != -1)
+				{
+					memset(&event, 0, sizeof(event));
+					event.events = EPOLLIN;
+					event.data.fd = clientfd;
+					if (epoll_ctl(epollfd, EPOLL_CTL_ADD, clientfd, &event) == -1)
+					{
+						std::cerr << "Error: adding client socket to the epoll instance: " << strerror(errno) << std::endl;
+						close(clientfd);
+						continue;
+					}
+				}
+			}
+			else // Client socket, read the request
 			{
 				int clientfd = events[i].data.fd;
 				std::string response = this->_processRequestResponse(clientfd);
@@ -120,7 +137,7 @@ void Server::runLinux()
 #elif defined(__APPLE__)
 void Server::runMac()
 {
-	int serverfd = this->_socket.getServerFd();
+	std::vector<int> serverfds = this->_socket.getServerFds();
 
 	// Create the kqueue instance
 	int kqueuefd = kqueue();
@@ -131,15 +148,20 @@ void Server::runMac()
 	}
 
 	struct kevent event, events[MAX_EVENTS];
-	EV_SET(&event, serverfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
-	if (kevent(kqueuefd, &event, 1, NULL, 0, NULL) == -1)
+
+	for (std::vector<int>::const_iterator it = serverfds.begin(); it != serverfds.end(); ++it)
 	{
-		std::cerr << "Error: adding the server socket to the kqueue instance: " << strerror(errno) << std::endl;
-		close(kqueuefd);
-		exit(EXIT_FAILURE);
+		// Add the server socket to the kqueue instance
+		EV_SET(&event, *it, EVFILT_READ, EV_ADD, 0, 0, NULL);
+		if (kevent(kqueuefd, &event, 1, NULL, 0, NULL) == -1)
+		{
+			std::cerr << "Error: adding the server socket to the kqueue instance: " << strerror(errno) << std::endl;
+			close(kqueuefd);
+			exit(EXIT_FAILURE);
+		}
 	}
 
-	std::cout << "Server is running on port 6969..." << std::endl
+	std::cout << "Server running..." << std::endl
 			  << std::endl;
 
 	// Main loop
@@ -155,22 +177,33 @@ void Server::runMac()
 
 		for (int i = 0; i < nevents; i++)
 		{
-			if (static_cast<int>(events[i].ident) == serverfd)
+			bool isServerSocket = false;
+			for (std::vector<int>::const_iterator it = serverfds.begin(); it != serverfds.end(); ++it)
 			{
-				int clientfd = this->_acceptClient();
-
-				// Add the client socket to the kqueue instance
-				EV_SET(&event, clientfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
-				if (kevent(kqueuefd, &event, 1, NULL, 0, NULL) == -1)
+				if (static_cast<int>(events[i].ident) == *it)
 				{
-					std::cerr << "Error: adding the client socket to the kqueue instance: " << strerror(errno) << std::endl;
-					close(clientfd);
-					continue;
+					isServerSocket = true;
+					break;
 				}
 			}
-			else
+
+			if (isServerSocket)
 			{
-				int clientfd = events[i].ident;
+				int clientfd = this->_acceptClient(static_cast<int>(events[i].ident));
+				if (clientfd != -1) // Add the client socket to the kqueue instance if the client was accepted
+				{
+					EV_SET(&event, clientfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
+					if (kevent(kqueuefd, &event, 1, NULL, 0, NULL) == -1)
+					{
+						std::cerr << "Error: accepting the incoming connection" << std::endl;
+						close(clientfd);
+						continue;
+					}
+				}
+			}
+			else // Client socket, read the request
+			{
+				int clientfd = static_cast<int>(events[i].ident);
 				std::string response = this->_processRequestResponse(clientfd);
 				this->_sendResponse(clientfd, response);
 				close(clientfd);
@@ -181,9 +214,8 @@ void Server::runMac()
 }
 #endif
 
-int Server::_acceptClient()
+int Server::_acceptClient(int serverfd)
 {
-	int serverfd = this->_socket.getServerFd();
 	// Accept the incoming connection
 	struct sockaddr_in clientAddress;
 	socklen_t clientAddressSize = sizeof(clientAddress);
@@ -191,9 +223,11 @@ int Server::_acceptClient()
 	if (clientfd == -1)
 	{
 		std::cerr << "Error: accepting the incoming connection: " << strerror(errno) << std::endl;
-		close(clientfd);
 		return -1;
 	}
+
+	// ! Not necessary to set the client socket to non-blocking because we are using epoll/kqueue
+
 	return clientfd;
 }
 
@@ -229,8 +263,7 @@ std::string Server::_processRequestResponse(int clientfd)
 {
 	StatusCode statusCode = NO_STATUS_CODE;
 
-	std::pair<std::string, int>
-		hostInfo = getHostInfo(clientfd);											   // Get the host and port from the request
+	std::pair<std::string, int> hostInfo = getHostInfo(clientfd);					   // Get the host and port from the request
 	std::pair<std::string, int> destInfo = this->_socket.getDestinationInfo(clientfd); // Get the IP and port of the destination for choose the server block because we create only one Socket for all the server blocks
 
 	const std::pair<bool, ServerConfig> config = this->_globalConfig.getServerConfig(hostInfo, destInfo);

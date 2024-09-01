@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 12:20:23 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/31 12:16:10 by isromero         ###   ########.fr       */
+/*   Updated: 2024/09/01 17:25:13 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,20 +22,21 @@ class Socket
 {
 private:
 	GlobalConfig _globalConfig;
-	int _serverfd;
+	std::vector<int> _serverfds; // ! We use one instance of socket but handle multiple serverfds for each server block
 
-	void _createSocket();
-	void _configureSocket();
-	void _bindSocket();
-	void _listenSocket();
+	int _createSocket();
+	void _configureSocket(int serverfd);
+	void _bindSocket(int serverfd, std::vector<ServerConfig>::const_iterator it);
+	void _listenSocket(int serverfd);
 
 public:
 	Socket(GlobalConfig config);
 	~Socket();
 
-	void init();
+	void createSockets();
 	std::pair<std::string, int> getDestinationInfo(int clientfd);
-	int getServerFd() const;
+
+	std::vector<int> getServerFds() const;
 };
 
 #endif

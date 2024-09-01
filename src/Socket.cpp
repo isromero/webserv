@@ -6,65 +6,82 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 12:21:58 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/31 12:16:30 by isromero         ###   ########.fr       */
+/*   Updated: 2024/09/01 19:41:01 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Socket.hpp"
 
-Socket::Socket(GlobalConfig config) : _globalConfig(config), _serverfd(-1) {}
+Socket::Socket(GlobalConfig config) : _globalConfig(config), _serverfds() {}
 
 Socket::~Socket()
 {
-	if (this->_serverfd != -1)
-		close(this->_serverfd);
+	for (std::vector<int>::iterator it = this->_serverfds.begin(); it != this->_serverfds.end(); ++it)
+		close(*it);
 }
 
-void Socket::_createSocket()
+int Socket::_createSocket()
 {
 	// AF_INET: ipv4
 	// SOCK_STREAM: TCP
 	// 0: Default (0 = TCP)
-	this->_serverfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (this->_serverfd < 0)
+	int serverfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (serverfd < 0)
 		throw std::runtime_error("Error: creating the socket: " + std::string(strerror(errno)));
+
+	return serverfd;
 }
 
-void Socket::_configureSocket()
+void Socket::_configureSocket(int serverfd)
 {
 	// Set the socket to reuse the address for restart and avoid the "Address already in use" error
 	int enable = 1;
-	if (setsockopt(this->_serverfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) == -1)
+	if (setsockopt(serverfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int)) == -1)
 		throw std::runtime_error("Error: setting the socket options: " + std::string(strerror(errno)));
 }
 
-void Socket::_bindSocket()
+void Socket::_bindSocket(int serverfd, std::vector<ServerConfig>::const_iterator it)
 {
 	// Create the server address
 	struct sockaddr_in serverAddress;
 	memset(&serverAddress, 0, sizeof(serverAddress)); // Good practice
-	serverAddress.sin_family = AF_INET;
-	serverAddress.sin_port = htons(this->_globalConfig.getMainPort()); // htons converts the port number to network byte order
-	serverAddress.sin_addr.s_addr = INADDR_ANY;						   // ! We accept connections from any IP BUT then the server choose the configs of the server blocks that match the host
+	serverAddress.sin_family = AF_INET;				  // IPv4
+	serverAddress.sin_port = htons(it->getPort());	  // Convert the port to network byte order
+
+	if (it->getHost() == "0.0.0.0" || it->getHost().empty())
+		serverAddress.sin_addr.s_addr = INADDR_ANY;
+	else if (it->getHost() == "localhost" || it->getHost() == "127.0.0.1")
+		serverAddress.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+	else
+	{
+		if (inet_pton(AF_INET, it->getHost().c_str(), &serverAddress.sin_addr) <= 0)
+			throw std::runtime_error("Error: converting the IP address: " + std::string(strerror(errno)));
+	}
 
 	// Bind the socket to the address and port
-	if (bind(this->_serverfd, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) == -1)
+	if (bind(serverfd, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) == -1)
 		throw std::runtime_error("Error: binding the socket: " + std::string(strerror(errno)));
 }
 
-void Socket::_listenSocket()
+void Socket::_listenSocket(int serverfd)
 {
 	// Listen for incoming connections
-	if (listen(this->_serverfd, MAX_CLIENTS) == -1)
+	if (listen(serverfd, MAX_CLIENTS) == -1)
 		throw std::runtime_error("Error: listening the socket: " + std::string(strerror(errno)));
 }
 
-void Socket::init()
+void Socket::createSockets()
 {
-	this->_createSocket();
-	this->_configureSocket();
-	this->_bindSocket();
-	this->_listenSocket();
+	const std::vector<ServerConfig> &servers = this->_globalConfig.getServers();
+	for (std::vector<ServerConfig>::const_iterator it = servers.begin(); it != servers.end(); ++it)
+	{
+		int serverfd = this->_createSocket();
+		this->_configureSocket(serverfd);
+		this->_bindSocket(serverfd, it);
+		this->_listenSocket(serverfd);
+
+		this->_serverfds.push_back(serverfd);
+	}
 }
 
 // Get the IP and port of the destination for choose the server block because we create only one Socket for all the server blocks
@@ -83,7 +100,4 @@ std::pair<std::string, int> Socket::getDestinationInfo(int clientfd)
 	return std::make_pair(std::string(destIP), ntohs(clientAddress.sin_port));
 }
 
-int Socket::getServerFd() const
-{
-	return this->_serverfd;
-}
+std::vector<int> Socket::getServerFds() const { return this->_serverfds; }

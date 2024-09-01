@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/31 12:33:54 by isromero         ###   ########.fr       */
+/*   Updated: 2024/09/01 20:25:42 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -406,6 +406,7 @@ StatusCode Response::_handleGET()
 	}
 
 	if (access(this->_responsePath.c_str(), F_OK) != 0) // Check if the file exists
+
 		return ERROR_404;
 	else if (access(this->_responsePath.c_str(), R_OK) != 0) // Check if the file is readable
 		return ERROR_403;

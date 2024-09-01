@@ -34,7 +34,7 @@ private:
 	GlobalConfig _globalConfig;
 	Socket _socket;
 
-	int _acceptClient();
+	int _acceptClient(int serverfd);
 	std::string _processRequestResponse(int clientfd);
 	void _sendResponse(int clientfd, const std::string &response);
 

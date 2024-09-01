@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/28 19:20:21 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/31 12:54:33 by isromero         ###   ########.fr       */
+/*   Updated: 2024/09/01 19:47:14 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -149,7 +149,12 @@ void GlobalConfig::_parseServerParameters(ServerConfig &currentServer, const std
 			currentServer.addServerName(value);
 	}
 	else if (param == "host")
-		currentServer.setHost(value);
+	{
+		if (value == "localhost")
+			currentServer.setHost("127.0.0.1");
+		else
+			currentServer.setHost(value);
+	}
 	else if (param == "root")
 	{
 		const std::string root = "./" + value;
@@ -260,14 +265,6 @@ void GlobalConfig::_parseLocationBlock(ServerConfig &currentServer, const std::s
 	currentServer.addLocation(location);
 }
 
-int GlobalConfig::getMainPort() const
-{
-	if (!this->_servers.empty())
-		return this->_servers[0].getPort();
-	else
-		return 6969; // Default port
-}
-
 const std::pair<bool, ServerConfig> GlobalConfig::getServerConfig(const std::pair<std::string, int> &hostInfo, const std::pair<std::string, int> &destInfo) const
 {
 	ServerConfig defaultServer;
@@ -275,17 +272,13 @@ const std::pair<bool, ServerConfig> GlobalConfig::getServerConfig(const std::pai
 
 	for (std::vector<ServerConfig>::const_iterator it = this->_servers.begin(); it != this->_servers.end(); ++it)
 	{
-		std::cout << "Host: " << hostInfo.first << " Port: " << hostInfo.second << std::endl;
-		std::cout << "Dest: " << destInfo.first << " Port: " << destInfo.second << std::endl;
-
-		std::cout << "Server: " << it->getHost() << " Port: " << it->getPort() << std::endl;
-		if (it->getPort() != destInfo.second) // It's not the server for this port
+		if (it->getPort() != destInfo.second)
 			continue;
 
-		if (it->getHost() != "0.0.0.0" && it->getHost() != destInfo.first) // It's not the server for this host
+		if (it->getHost() != "0.0.0.0" && it->getHost() != destInfo.first)
 			continue;
 
-			if (it->getServerNames().empty())
+		if (it->getServerNames().empty())
 		{
 			defaultServer = *it; // Save the default server for this port
 			found = true;
@@ -305,3 +298,5 @@ const std::pair<bool, ServerConfig> GlobalConfig::getServerConfig(const std::pai
 
 	return std::make_pair(false, defaultServer);
 }
+
+const std::vector<ServerConfig> &GlobalConfig::getServers() const { return this->_servers; }

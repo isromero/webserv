@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 13:44:05 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/31 11:47:33 by isromero         ###   ########.fr       */
+/*   Updated: 2024/09/01 20:23:15 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -287,6 +287,10 @@ StatusCode Request::_parseHeaders(size_t &pos, size_t &end, size_t &contentLengt
 			break;
 		}
 	}
+
+	// If no exact match is found, use the default configuration if serverNames is empty
+	if (!hostMatches && serverNames.empty())
+		hostMatches = true;
 
 	if (!hostMatches)
 		return ERROR_400;

@@ -12,7 +12,7 @@
 
 #include "ServerConfig.hpp"
 
-ServerConfig::ServerConfig() : _port(6969), _serverNames(), _host("0.0.0.0"), _root("/var/www/html"), _indexes(), _clientMaxBodySize(1024 * 1024), _errorPages(), _locations()
+ServerConfig::ServerConfig() : _port(6969), _serverNames(), _host("0.0.0.0"), _root("./var/www/html"), _indexes(), _clientMaxBodySize(1024 * 1024), _errorPages(), _locations()
 {
 }
 
@@ -78,7 +78,7 @@ const std::string ServerConfig::getUploadDir(const std::string &path) const
 		if (mainPath == it->path)
 			return it->uploadDir;
 	}
-	return "/var/www/uploads"; // If no location block matches, return the default upload directory
+	return "./var/www/uploads"; // If no location block matches, return the default upload directory
 }
 
 const std::string ServerConfig::getRedirect(const std::string &path) const
