@@ -93,6 +93,55 @@ const std::string ServerConfig::getRedirect(const std::string &path) const
 	return ""; // If no location block matches, return an empty string
 }
 
+const std::string ServerConfig::getLocationPath(const std::string &path) const
+{
+	const std::string mainPath = extractMainPath(path);
+
+	for (std::vector<LocationConfig>::const_iterator it = this->_locations.begin(); it != this->_locations.end(); ++it)
+	{
+		if (mainPath == it->path)
+			return it->path;
+	}
+	return ""; // If no location block matches, return an empty string
+}
+
+const std::string ServerConfig::getLocationCGIPath(const std::string &path) const
+{
+	std::string mainPath = path;
+	const std::string pathInfo = extractPathInfo(mainPath);
+	const std::string queryString = extractQueryString(mainPath);
+	mainPath = extractCGIMainPath(mainPath);
+
+	for (std::vector<LocationConfig>::const_iterator it = this->_locations.begin(); it != this->_locations.end(); ++it)
+	{
+		if (mainPath == it->path)
+			return it->path;
+	}
+	return ""; // If no location block matches, return an empty string
+}
+
+const std::string ServerConfig::getCGIExtension(const std::string &mainPath) const
+{
+	for (std::vector<LocationConfig>::const_iterator it = this->_locations.begin(); it != this->_locations.end(); ++it)
+	{
+		if (mainPath == it->path)
+			return it->cgiExtension;
+	}
+	return ".cgi"; // If no location block matches, return the default CGI extension
+}
+
+const std::string ServerConfig::getCGIBin(const std::string &path) const
+{
+	const std::string mainPath = extractMainPath(path);
+
+	for (std::vector<LocationConfig>::const_iterator it = this->_locations.begin(); it != this->_locations.end(); ++it)
+	{
+		if (mainPath == it->path)
+			return it->cgiBin;
+	}
+	return "./var/www/cgi-bin"; // If no location block matches, return the default CGI bin directory
+}
+
 void ServerConfig::setPort(int port) { this->_port = port; }
 void ServerConfig::addServerName(const std::string &serverName) { this->_serverNames.push_back(serverName); }
 void ServerConfig::setHost(const std::string &host) { this->_host = host; }

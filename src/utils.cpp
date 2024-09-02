@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:29:36 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/28 20:01:55 by isromero         ###   ########.fr       */
+/*   Updated: 2024/09/02 21:21:47 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -109,4 +109,49 @@ const std::string extractMainPath(const std::string &fullPath)
 	if (lastSlash == 0)
 		return "/";
 	return fullPath.substr(0, lastSlash + 1); // Include the last slash
+}
+
+const std::string extractCGIMainPath(const std::string &path)
+{
+	size_t extensionPos = path.find_last_of('.');
+	if (extensionPos == std::string::npos)
+		return "";
+
+	// Find the last occurrence of '/'
+	size_t lastSlashPos = path.find_last_of('/');
+	if (lastSlashPos == std::string::npos || lastSlashPos > extensionPos)
+		return "";
+
+	// Extract the main path, excluding the script name
+	return path.substr(0, lastSlashPos + 1);
+}
+
+const std::string extractQueryString(std::string &scriptName)
+{
+	std::string queryString = "";
+
+	// Check if there is a query string (?key=value&key2=value2)
+	size_t queryPos = scriptName.find('?');
+	if (queryPos != std::string::npos) // There is a query string
+	{
+		size_t queryEnd = scriptName.find_first_of('/', queryPos);
+		queryString = scriptName.substr(queryPos + 1, queryEnd - queryPos - 1);
+		scriptName = scriptName.substr(0, queryPos);
+	}
+	return queryString;
+}
+
+const std::string extractPathInfo(std::string &scriptName)
+{
+	std::string pathInfo = "";
+
+	// Get the path info (the part of the URL after the script name and before the query string: /cgi-bin/script.cgi/path/info)
+	std::string scriptUntilDot = scriptName.substr(scriptName.find_last_of('.'));
+	size_t pathInfoPos = scriptUntilDot.find_first_of('/');
+	if (pathInfoPos != std::string::npos)
+	{
+		pathInfo = scriptUntilDot.substr(pathInfoPos);
+		scriptName = scriptName.substr(0, scriptName.find_last_of('/') + 1);
+	}
+	return pathInfo;
 }

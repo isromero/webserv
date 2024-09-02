@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/09/01 20:25:42 by isromero         ###   ########.fr       */
+/*   Updated: 2024/09/02 21:37:20 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -225,7 +225,14 @@ StatusCode Response::handleMethods()
 
 bool Response::_isCGIRequest() const
 {
-	if (this->_requestedPath.substr(0, 9) == "/cgi-bin/") // This means that the requested file is a CGI script because starts with /cgi-bin/
+	if (this->_requestedPath.empty()) // Prevents segfaults(basic_string)
+		return false;
+
+	const std::string mainPath = this->_requestedPath.substr(0, this->_config.getLocationCGIPath(this->_requestedPath).size());
+	const std::string locationPath = this->_config.getLocationCGIPath(this->_requestedPath);
+
+	// Check if the requested path is the same as the location path of the location CGI block
+	if (mainPath.compare(locationPath) == 0)
 		return true;
 	return false;
 }
@@ -280,27 +287,18 @@ StatusCode Response::_handleCGI()
 			setenv("CONTENT_LENGTH", toString(this->_requestBody.size()).c_str(), 1); // Not necessary in GET requests
 		}
 
-		std::string scriptName = this->_requestedPath;
-		std::string pathInfo = "";
-		std::string queryString = "";
+		const std::string mainPath = this->_requestedPath.substr(0, this->_config.getLocationCGIPath(this->_requestedPath).size());
+		std::string scriptName = this->_requestedPath.substr(this->_config.getLocationCGIPath(this->_requestedPath).size()); // The script name is the part of the URL after the location path
+		std::string pathInfo = extractPathInfo(scriptName);
+		std::string queryString = extractQueryString(scriptName);
 
-		// Check if there is a query string (?key=value&key2=value2)
-		size_t queryPos = scriptName.find('?');
-		if (queryPos != std::string::npos) // There is a query string
-		{
-			queryString = scriptName.substr(queryPos + 1);
-			scriptName = scriptName.substr(0, queryPos);
-		}
+		// Check if script has the extension specified in the location block
+		std::string extension = scriptName.substr(scriptName.find_last_of('.'));
+		std::string cgiExtension = this->_config.getCGIExtension(mainPath);
+		if (extension != cgiExtension)
+			exit(3);
 
-		// Get the path info (the part of the URL after the script name and before the query string: /cgi-bin/script.cgi/path/info)
-		size_t scriptEnd = scriptName.find('/', 9); // 9 = /cgi-bin/ length
-		if (scriptEnd != std::string::npos)			// There is a path info
-		{
-			pathInfo = scriptName.substr(scriptEnd);
-			scriptName = scriptName.substr(0, scriptEnd);
-		}
-
-		std::string scriptPath = "./pages" + scriptName;
+		std::string scriptPath = this->_config.getCGIBin(this->_requestedPath) + "/" + scriptName;
 
 		if (access(scriptPath.c_str(), F_OK) != 0) // Check if the CGI script exists
 			exit(2);
