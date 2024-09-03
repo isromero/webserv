@@ -105,12 +105,9 @@ const std::string ServerConfig::getLocationPath(const std::string &path) const
 	return ""; // If no location block matches, return an empty string
 }
 
-const std::string ServerConfig::getLocationCGIPath(const std::string &path) const
+const std::string ServerConfig::getLocationCGIPath(const std::string path) const
 {
-	std::string mainPath = path;
-	const std::string pathInfo = extractPathInfo(mainPath);
-	const std::string queryString = extractQueryString(mainPath);
-	mainPath = extractCGIMainPath(mainPath);
+	std::string mainPath = extractCGIMainPath(path);
 
 	for (std::vector<LocationConfig>::const_iterator it = this->_locations.begin(); it != this->_locations.end(); ++it)
 	{

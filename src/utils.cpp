@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:29:36 by isromero          #+#    #+#             */
-/*   Updated: 2024/09/02 21:21:47 by isromero         ###   ########.fr       */
+/*   Updated: 2024/09/03 20:02:53 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -111,47 +111,48 @@ const std::string extractMainPath(const std::string &fullPath)
 	return fullPath.substr(0, lastSlash + 1); // Include the last slash
 }
 
-const std::string extractCGIMainPath(const std::string &path)
+// Get the main path of a CGI script (the part of the URL before the script name)
+const std::string extractCGIMainPath(const std::string &fullPath)
 {
-	size_t extensionPos = path.find_last_of('.');
-	if (extensionPos == std::string::npos)
-		return "";
+	std::string path = fullPath;
+	const std::string queryString = extractQueryString(path);
+	const std::string pathInfo = extractPathInfo(path);
 
-	// Find the last occurrence of '/'
-	size_t lastSlashPos = path.find_last_of('/');
-	if (lastSlashPos == std::string::npos || lastSlashPos > extensionPos)
-		return "";
+	// Now path is the script name with the route
+	const std::string mainPath = extractMainPath(path); // We get the main part of the path (/cgi-bin/script.cgi) -> /cgi-bin/
 
-	// Extract the main path, excluding the script name
-	return path.substr(0, lastSlashPos + 1);
+	return mainPath;
 }
 
-const std::string extractQueryString(std::string &scriptName)
+// Get the query string (the part of the URL after the ?) and modify the path to remove it
+const std::string extractQueryString(std::string &path)
 {
 	std::string queryString = "";
 
-	// Check if there is a query string (?key=value&key2=value2)
-	size_t queryPos = scriptName.find('?');
-	if (queryPos != std::string::npos) // There is a query string
+	size_t queryPos = path.find('?');
+	if (queryPos != std::string::npos)
 	{
-		size_t queryEnd = scriptName.find_first_of('/', queryPos);
-		queryString = scriptName.substr(queryPos + 1, queryEnd - queryPos - 1);
-		scriptName = scriptName.substr(0, queryPos);
+		size_t queryEnd = path.find('/', queryPos);
+		if (queryEnd == std::string::npos)
+			queryString = path.substr(queryPos + 1);
+		else
+			queryString = path.substr(queryPos + 1, queryEnd - queryPos - 1);
+
+		path = path.substr(0, queryPos);
 	}
 	return queryString;
 }
 
-const std::string extractPathInfo(std::string &scriptName)
+// Get the path info (the part of the URL after the script name: /cgi-bin/script.cgi/path/info) and modify the path to remove it
+const std::string extractPathInfo(std::string &path)
 {
 	std::string pathInfo = "";
 
-	// Get the path info (the part of the URL after the script name and before the query string: /cgi-bin/script.cgi/path/info)
-	std::string scriptUntilDot = scriptName.substr(scriptName.find_last_of('.'));
-	size_t pathInfoPos = scriptUntilDot.find_first_of('/');
-	if (pathInfoPos != std::string::npos)
+	size_t scriptEndPos = path.find_first_of('/', path.find_last_of('.'));
+	if (scriptEndPos != std::string::npos)
 	{
-		pathInfo = scriptUntilDot.substr(pathInfoPos);
-		scriptName = scriptName.substr(0, scriptName.find_last_of('/') + 1);
+		pathInfo = path.substr(scriptEndPos);
+		path = path.substr(0, scriptEndPos);
 	}
 	return pathInfo;
 }

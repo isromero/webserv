@@ -49,7 +49,7 @@ public:
 	const std::string getUploadDir(const std::string &path) const;
 	const std::string getRedirect(const std::string &path) const;
 	const std::string getLocationPath(const std::string &path) const;
-	const std::string getLocationCGIPath(const std::string &path) const;
+	const std::string getLocationCGIPath(const std::string path) const;
 	const std::string getCGIExtension(const std::string &mainPath) const;
 	const std::string getCGIBin(const std::string &path) const;
 
