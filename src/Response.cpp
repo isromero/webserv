@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/09/03 19:37:36 by isromero         ###   ########.fr       */
+/*   Updated: 2024/09/03 21:14:09 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -225,15 +225,18 @@ StatusCode Response::handleMethods()
 
 bool Response::_isCGIRequest() const
 {
-	if (this->_requestedPath.empty()) // Prevents segfaults(basic_string)
+	if (this->_requestedPath.empty())
 		return false;
 
 	const std::string cgiLocationPath = this->_config.getLocationCGIPath(this->_requestedPath);
-	if (cgiLocationPath.empty()) // Prevents segfaults(basic_string)
+	if (cgiLocationPath.empty())
 		return false;
 
 	const std::string mainPath = this->_requestedPath.substr(0, cgiLocationPath.size());
 	const std::string locationPath = this->_config.getLocationCGIPath(this->_requestedPath);
+
+	if (this->_config.getCGIBin(this->_requestedPath).empty() || this->_config.getCGIExtension(mainPath).empty())
+		return false;
 
 	// Check if the requested path is the same as the location path of the location CGI block
 	if (mainPath.compare(locationPath) == 0)

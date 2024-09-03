@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 12:21:58 by isromero          #+#    #+#             */
-/*   Updated: 2024/09/01 19:41:01 by isromero         ###   ########.fr       */
+/*   Updated: 2024/09/03 21:21:20 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,11 +14,7 @@
 
 Socket::Socket(GlobalConfig config) : _globalConfig(config), _serverfds() {}
 
-Socket::~Socket()
-{
-	for (std::vector<int>::iterator it = this->_serverfds.begin(); it != this->_serverfds.end(); ++it)
-		close(*it);
-}
+Socket::~Socket() {}
 
 int Socket::_createSocket()
 {

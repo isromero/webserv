@@ -50,7 +50,9 @@ Server &Server::operator=(const Server &other)
 	return *this;
 }
 
-Server::~Server() {}
+Server::~Server()
+{
+}
 
 #if defined(__linux__)
 void Server::runLinux()
@@ -273,7 +275,6 @@ std::string Server::_processRequestResponse(int clientfd)
 		Response response;
 		return response.handleResponse(statusCode);
 	}
-
 	Request request(clientfd, config.second);
 	statusCode = request.parseRequest();
 	std::cout << request.getRequest() << std::endl;
