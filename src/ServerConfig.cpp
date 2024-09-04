@@ -78,6 +78,7 @@ const std::string ServerConfig::getUploadDir(const std::string &path) const
 		if (mainPath == it->path)
 			return it->uploadDir;
 	}
+
 	return "./var/www/uploads"; // If no location block matches, return the default upload directory
 }
 

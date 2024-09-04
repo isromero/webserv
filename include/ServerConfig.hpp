@@ -25,6 +25,8 @@ struct LocationConfig
 	std::string cgiExtension;
 	std::string cgiBin;
 	std::string redirect;
+
+	LocationConfig() : path(), allowedMethods(), autoindex(false), uploadDir("./var/www/uploads"), cgiExtension(), cgiBin("./var/www/cgi-bin"), redirect() {}
 };
 
 class ServerConfig
