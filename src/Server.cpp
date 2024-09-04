@@ -129,7 +129,10 @@ void Server::runLinux()
 			{
 				int clientfd = events[i].data.fd;
 				std::string response = this->_processRequestResponse(clientfd);
-				this->_sendResponse(clientfd, response);
+				if (!response.empty())
+					this->_sendResponse(clientfd, response);
+				else
+					std::cout << "Client disconnected" << std::endl;
 				close(clientfd);
 			}
 		}
@@ -207,7 +210,10 @@ void Server::runMac()
 			{
 				int clientfd = static_cast<int>(events[i].ident);
 				std::string response = this->_processRequestResponse(clientfd);
-				this->_sendResponse(clientfd, response);
+				if (!response.empty())
+					this->_sendResponse(clientfd, response);
+				else
+					std::cout << "Client disconnected" << std::endl;
 				close(clientfd);
 			}
 		}
@@ -288,12 +294,14 @@ std::string Server::_processRequestResponse(int clientfd)
 
 void Server::_sendResponse(int clientfd, const std::string &response)
 {
-	if (response.empty()) // Client disconnected, so we don't need to send a response
-		return;
-
 	ssize_t bytesSent = send(clientfd, response.c_str(), response.size(), 0);
 	if (bytesSent == -1)
-		std::cerr << "Error: sending the response: " << strerror(errno) << std::endl;
+	{
+		if (errno == EBADF || errno == ECONNRESET || errno == EPIPE)
+			std::cerr << "Client disconnected" << std::endl;
+		else
+			std::cerr << "Error: sending the response: " << strerror(errno) << std::endl;
+	}
 	else
 		std::cout << response << std::endl;
 }
