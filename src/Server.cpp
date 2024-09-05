@@ -239,7 +239,7 @@ int Server::_acceptClient(int serverfd)
 	return clientfd;
 }
 
-static std::pair<std::string, int> getHostInfo(int clientfd)
+std::pair<std::string, int> Server::_getHostInfo(int clientfd)
 {
 	char buffer[1024];
 	ssize_t bytesRead = recv(clientfd, buffer, sizeof(buffer) - 1, MSG_PEEK); // MSG_PEEK flag reads the data without removing it from the queue
@@ -271,7 +271,7 @@ std::string Server::_processRequestResponse(int clientfd)
 {
 	StatusCode statusCode = NO_STATUS_CODE;
 
-	std::pair<std::string, int> hostInfo = getHostInfo(clientfd);					   // Get the host and port from the request
+	std::pair<std::string, int> hostInfo = this->_getHostInfo(clientfd);			   // Get the host and port from the request
 	std::pair<std::string, int> destInfo = this->_socket.getDestinationInfo(clientfd); // Get the IP and port of the destination for choose the server block because we create only one Socket for all the server blocks
 
 	const std::pair<bool, ServerConfig> config = this->_globalConfig.getServerConfig(hostInfo, destInfo);
@@ -296,12 +296,7 @@ void Server::_sendResponse(int clientfd, const std::string &response)
 {
 	ssize_t bytesSent = send(clientfd, response.c_str(), response.size(), 0);
 	if (bytesSent == -1)
-	{
-		if (errno == EBADF || errno == ECONNRESET || errno == EPIPE)
-			std::cerr << "Client disconnected" << std::endl;
-		else
-			std::cerr << "Error: sending the response: " << strerror(errno) << std::endl;
-	}
+		std::cerr << "Error: sending the response: " << strerror(errno) << std::endl;
 	else
 		std::cout << response << std::endl;
 }
