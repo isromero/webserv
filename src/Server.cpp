@@ -115,7 +115,7 @@ void Server::runLinux()
 				if (clientfd != -1)
 				{
 					memset(&event, 0, sizeof(event));
-					event.events = EPOLLIN;
+					event.events = EPOLLIN | EPOLLRDHUP | EPOLLERR; // Listen for read and hang-up events
 					event.data.fd = clientfd;
 					if (epoll_ctl(epollfd, EPOLL_CTL_ADD, clientfd, &event) == -1)
 					{
@@ -128,12 +128,30 @@ void Server::runLinux()
 			else // Client socket, read the request
 			{
 				int clientfd = events[i].data.fd;
+
+				// Check if client disconnected or error occurred
+				if (events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR))
+				{
+					std::cout << "Client disconnected" << std::endl;
+					close(clientfd);  // Close the client socket
+					continue;         // Skip further processing for this client
+				}
+
+				// Process the request and send the response
 				std::string response = this->_processRequestResponse(clientfd);
 				if (!response.empty())
-					this->_sendResponse(clientfd, response);
+				{
+					if (this->_sendResponse(clientfd, response) == -1)
+					{
+						std::cerr << "Error: sending the response: " << strerror(errno) << std::endl;
+						close(clientfd);  // Close the socket if sending fails
+					}
+				}
 				else
+				{
 					std::cout << "Client disconnected" << std::endl;
-				close(clientfd);
+					close(clientfd);  // Close the client socket
+				}
 			}
 		}
 	}
@@ -157,13 +175,14 @@ void Server::runMac()
 	for (std::vector<int>::const_iterator it = serverfds.begin(); it != serverfds.end(); ++it)
 	{
 		// Add the server socket to the kqueue instance
-		EV_SET(&event, *it, EVFILT_READ, EV_ADD, 0, 0, NULL);
+		EV_SET(&event, clientfd, EVFILT_READ, EV_ADD, 0, 0, NULL);
 		if (kevent(kqueuefd, &event, 1, NULL, 0, NULL) == -1)
 		{
-			std::cerr << "Error: adding the server socket to the kqueue instance: " << strerror(errno) << std::endl;
-			close(kqueuefd);
-			exit(EXIT_FAILURE);
+			std::cerr << "Error: accepting the incoming connection" << std::endl;
+			close(clientfd);
+			continue;
 		}
+
 	}
 
 	std::cout << "Server running..." << std::endl
@@ -209,13 +228,36 @@ void Server::runMac()
 			else // Client socket, read the request
 			{
 				int clientfd = static_cast<int>(events[i].ident);
+
+				// Buffer temporal para leer datos del cliente
+				char buffer[1024];
+				ssize_t bytesRead = recv(clientfd, buffer, sizeof(buffer), 0);
+
+				if (bytesRead == 0)  // Cliente desconectado
+				{
+					std::cout << "Client disconnected" << std::endl;
+					close(clientfd);  // Cerrar el socket del cliente
+					continue;         // Saltar más procesamiento para este cliente
+				}
+				else if (bytesRead == -1) // Error en la lectura
+				{
+					std::cerr << "Error: reading from client socket: " << strerror(errno) << std::endl;
+					close(clientfd);  // Cerrar el socket si ocurre un error
+					continue;         // Saltar más procesamiento
+				}
+
+				// Procesar la solicitud y enviar la respuesta
 				std::string response = this->_processRequestResponse(clientfd);
 				if (!response.empty())
-					this->_sendResponse(clientfd, response);
-				else
-					std::cout << "Client disconnected" << std::endl;
-				close(clientfd);
+				{
+					if (this->_sendResponse(clientfd, response) == -1)
+					{
+						std::cerr << "Error: sending the response: " << strerror(errno) << std::endl;
+						close(clientfd);  // Cerrar el socket si falló al enviar
+					}
+				}
 			}
+
 		}
 	}
 	close(kqueuefd);
@@ -292,11 +334,18 @@ std::string Server::_processRequestResponse(int clientfd)
 	return response.handleResponse(statusCode);
 }
 
-void Server::_sendResponse(int clientfd, const std::string &response)
+int Server::_sendResponse(int clientfd, const std::string &response)
 {
 	ssize_t bytesSent = send(clientfd, response.c_str(), response.size(), 0);
 	if (bytesSent == -1)
+	{
 		std::cerr << "Error: sending the response: " << strerror(errno) << std::endl;
+		return -1; // Devuelve -1 si falla
+	}
 	else
+	{
 		std::cout << response << std::endl;
+		return 0;  // Devuelve 0 si tiene éxito
+	}
 }
+
