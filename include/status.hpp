@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   status.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
+/*   By: adgutier <adgutier@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:42:33 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/27 19:37:59 by isromero         ###   ########.fr       */
+/*   Updated: 2024/09/08 17:34:07 by adgutier         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,6 +23,7 @@ enum StatusCode
 	ERROR_403,
 	ERROR_404,
 	ERROR_405,
+	ERROR_408,
 	ERROR_411,
 	ERROR_413,
 	ERROR_414,

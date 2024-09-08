@@ -6,7 +6,7 @@
 /*   By: adgutier <adgutier@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/09/07 17:45:52 by adgutier         ###   ########.fr       */
+/*   Updated: 2024/09/08 18:06:11 by adgutier         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -83,6 +83,11 @@ const std::string Response::handleResponse(StatusCode statusCode)
 	case ERROR_405:
 		statusLine = "HTTP/1.1 405 Method Not Allowed";
 		this->_responseBody = "405 Method Not Allowed: The method specified in the request is not allowed.";
+		isError = true;
+		break;
+	case ERROR_408:
+		statusLine = "HTTP/1.1 408 Request Timeout";
+		this->_responseBody = "The server timed out waiting for the request.";
 		isError = true;
 		break;
 	case ERROR_411:
@@ -323,7 +328,7 @@ StatusCode Response::_handleCGI()
             waitpid(pid, &status, 0);  // Limpiar el proceso hijo
             close(pipefd[1]);  // Cerrar el pipe
             close(pipefd[0]);  // Evitar zombies
-            return ERROR_500;  // Devolvemos un 504 Gateway Timeout
+            return ERROR_408;  // Devolvemos un 504 Gateway Timeout
         }
 
         close(pipefd[1]); // Cerrar escritura en el padre
