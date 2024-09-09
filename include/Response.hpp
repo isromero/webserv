@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Response.hpp                                       :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: adgutier <adgutier@student.42madrid.com    +#+  +:+       +#+        */
+/*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:52:54 by isromero          #+#    #+#             */
-/*   Updated: 2024/09/07 17:06:57 by adgutier         ###   ########.fr       */
+/*   Updated: 2024/09/09 21:32:30 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 

@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/09/09 21:19:58 by isromero         ###   ########.fr       */
+/*   Updated: 2024/09/09 21:32:25 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -169,6 +169,9 @@ const std::string Response::handleResponse(StatusCode statusCode)
 	// For POST 201 the location header is where the new resource is located just for info/testing purposes
 	if (this->_locationHeader != "")
 		this->_responseHeaders["Location"] = this->_locationHeader;
+
+	if (statusCode == ERROR_408)
+		this->_responseHeaders["Connection"] = "close"; // If the server timed out, we close the connection
 
 	if (isError)
 	{
