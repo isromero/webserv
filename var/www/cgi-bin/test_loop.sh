@@ -1,12 +1,9 @@
 #!/bin/bash
-
 # Imprimir encabezados HTTP necesarios
 echo "Content-Type: text/plain"
-echo "Cache-Control: no-cache"
-echo "Expires: 0"
 echo ""
 
-# Mensaje inicial
+# Mensaje inicial en el cuerpo de la respuesta
 echo "Entering infinite loop..."
 
 # Bucle infinito

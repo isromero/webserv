@@ -6,7 +6,7 @@
 /*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/28 18:49:21 by isromero          #+#    #+#             */
-/*   Updated: 2024/08/28 19:01:00 by isromero         ###   ########.fr       */
+/*   Updated: 2024/09/08 21:27:23 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -34,5 +34,7 @@
 #include <ctime>
 #include <iomanip>
 #include <cctype>
+#include <algorithm>
+#include <csignal>
 
 #endif

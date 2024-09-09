@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Response.cpp                                       :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: adgutier <adgutier@student.42madrid.com    +#+  +:+       +#+        */
+/*   By: isromero <isromero@student.42madrid.com    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/08/14 16:54:49 by isromero          #+#    #+#             */
-/*   Updated: 2024/09/08 18:06:11 by adgutier         ###   ########.fr       */
+/*   Updated: 2024/09/09 21:19:58 by isromero         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -183,7 +183,10 @@ const std::string Response::handleResponse(StatusCode statusCode)
 		else
 		{
 			this->_responseHeaders["Content-Type"] = "text/html"; // Error pages are always html
-			this->_responseBody = this->_generateHTMLPage(isError, statusLine, this->_responseBody);
+			if (statusCode == ERROR_408)						  // Override the body(because maybe the CGI script returned something)
+				this->_responseBody = this->_generateHTMLPage(isError, statusLine, "The server timed out waiting for the request.");
+			else
+				this->_responseBody = this->_generateHTMLPage(isError, statusLine, this->_responseBody);
 		}
 	}
 	else if (!isError && !this->_isCGIRequest())
@@ -251,125 +254,162 @@ bool Response::_isCGIRequest() const
 
 StatusCode Response::_handleCGI()
 {
-    int pipefd[2];
-    if (pipe(pipefd) == -1)
-        return ERROR_500;
+	int pipefd[2];
+	if (pipe(pipefd) == -1)
+		return ERROR_500;
 
-    pid_t pid = fork();
-    if (pid == -1)
-        return ERROR_500;
-    else if (pid == 0)
-    {
-        close(pipefd[0]); // Cerrar lectura en el proceso hijo
+	pid_t pid = fork();
+	if (pid == -1)
+		return ERROR_500;
+	else if (pid == 0)
+	{
+		close(pipefd[0]); // Close reading in the child
 
-        // Redirigir stdout al pipe
-        if (dup2(pipefd[1], STDOUT_FILENO) == -1)
-        {
-            std::cerr << "Error: duplicando file descriptor para stdout: " << strerror(errno) << std::endl;
-            exit(1);
-        }
-        close(pipefd[1]);
+		// Redirect stdout to the pipe
+		if (dup2(pipefd[1], STDOUT_FILENO) == -1)
+		{
+			std::cerr << "Error: duplicating file descriptor for stdout: " << strerror(errno) << std::endl;
+			exit(1);
+		}
+		close(pipefd[1]);
 
-        // Si es una solicitud POST, redirigir stdin al pipe
-        if (this->_method == "POST")
-        {
-            int inputPipe[2];
-            if (pipe(inputPipe) == -1)
-            {
-                std::cerr << "Error: creando el pipe de entrada: " << strerror(errno) << std::endl;
-                exit(1);
-            }
+		// If it is a POST request, we need to redirect stdin to the pipe because the CGI script will read from it
+		if (this->_method == "POST")
+		{
+			int inputPipe[2];
+			if (pipe(inputPipe) == -1)
+			{
+				std::cerr << "Error: creating the input pipe: " << strerror(errno) << std::endl;
+				exit(1);
+			}
 
-            if (dup2(inputPipe[0], STDIN_FILENO) == -1)
-            {
-                std::cerr << "Error: duplicando file descriptor para stdin: " << strerror(errno) << std::endl;
-                exit(1);
-            }
-            close(inputPipe[0]);
+			if (dup2(inputPipe[0], STDIN_FILENO) == -1)
+			{
+				std::cerr << "Error: duplicating file descriptor for stdin: " << strerror(errno) << std::endl;
+				exit(1);
+			}
+			close(inputPipe[0]); // Close the reading end of the pipe
 
-            // Escribir el cuerpo de la solicitud en el pipe
-            ssize_t bytesWritten = write(inputPipe[1], this->_requestBody.c_str(), this->_requestBody.size());
-            if (bytesWritten == -1)
-            {
-                std::cerr << "Error: escribiendo en el pipe: " << strerror(errno) << std::endl;
-                exit(1);
-            }
-            close(inputPipe[1]); // Cerrar escritura en el pipe
+			// Write the body to the pipe
+			ssize_t bytesWritten = write(inputPipe[1], this->_requestBody.c_str(), this->_requestBody.size());
+			if (bytesWritten == -1)
+			{
+				std::cerr << "Error: writing to the pipe: " << strerror(errno) << std::endl;
+				exit(1);
+			}
+			close(inputPipe[1]); // Close the writing end of the pipe
 
-            setenv("CONTENT_LENGTH", toString(this->_requestBody.size()).c_str(), 1); // Solo para POST
-        }
+			setenv("CONTENT_LENGTH", toString(this->_requestBody.size()).c_str(), 1); // Not necessary in GET requests
+		}
 
-        // Preparar el script y sus variables de entorno
-        std::string scriptPath = this->_config.getCGIBin(this->_requestedPath) + "/" + this->_requestedPath.substr(this->_config.getLocationCGIPath(this->_requestedPath).size());
-        
-        // Ejecutar el CGI
-        char *args[] = {const_cast<char *>(scriptPath.c_str()), NULL};
-        execve(scriptPath.c_str(), args, environ);
+		const std::string mainPath = this->_requestedPath.substr(0, this->_config.getLocationCGIPath(this->_requestedPath).size());
+		std::string scriptName = this->_requestedPath.substr(this->_config.getLocationCGIPath(this->_requestedPath).size()); // The script name is the part of the URL after the location path
+		std::string pathInfo = extractPathInfo(scriptName);
+		std::string queryString = extractQueryString(scriptName);
 
-        std::cerr << "Error: ejecutando el script CGI: " << strerror(errno) << std::endl;
-        exit(1);
-    }
-    else if (pid > 0)
-    {
-        // Proceso padre - manejo del timeout
-        int status;
-        int timeout = 5;  // Tiempo límite de 5 segundos
-        pid_t result = waitpid(pid, &status, WNOHANG);
-        while (timeout > 0 && result == 0) {
-            sleep(1);  // Espera 1 segundo
-            timeout--;
-            result = waitpid(pid, &status, WNOHANG);
-        }
+		// Check if script has the extension specified in the location block
+		std::string extension = scriptName.substr(scriptName.find_last_of('.'));
+		std::string cgiExtension = this->_config.getCGIExtension(mainPath);
+		if (extension != cgiExtension)
+			exit(3);
 
-        if (timeout == 0) {
-            // Tiempo límite alcanzado, matamos al proceso CGI
-            kill(pid, SIGKILL);
-            std::cerr << "CGI timeout reached, process killed." << std::endl;
-            waitpid(pid, &status, 0);  // Limpiar el proceso hijo
-            close(pipefd[1]);  // Cerrar el pipe
-            close(pipefd[0]);  // Evitar zombies
-            return ERROR_408;  // Devolvemos un 504 Gateway Timeout
-        }
+		std::string scriptPath = this->_config.getCGIBin(this->_requestedPath) + "/" + scriptName;
 
-        close(pipefd[1]); // Cerrar escritura en el padre
+		if (access(scriptPath.c_str(), F_OK) != 0) // Check if the CGI script exists
+			exit(2);
+		else if (access(scriptPath.c_str(), X_OK) != 0) // Check if the CGI script is executable
+			exit(3);
 
-        // Leer la salida del CGI
-        char buffer[1024];
-        ssize_t bytesRead;
-        while ((bytesRead = read(pipefd[0], buffer, sizeof(buffer))) > 0)
-            this->_cgiBody.append(buffer, bytesRead);
+		// CGIs need to have some environment variables set
+		setenv("REQUEST_METHOD", this->_method.c_str(), 1);
+		setenv("SCRIPT_NAME", this->_requestedPath.c_str(), 1);
+		setenv("CONTENT_TYPE", _determineContentType(scriptPath).c_str(), 1);
+		setenv("GATEWAY_INTERFACE", "CGI/1.1", 1);
+		setenv("SERVER_PROTOCOL", "HTTP/1.1", 1);
+		setenv("SCRIPT_NAME", scriptName.c_str(), 1);
+		setenv("PATH_INFO", pathInfo.c_str(), 1);
+		setenv("QUERY_STRING", queryString.c_str(), 1);
 
-        close(pipefd[0]); // Cerrar lectura
+		char *args[] = {const_cast<char *>(scriptPath.c_str()), NULL};
+		execve(scriptPath.c_str(), args, environ);
 
-        // Esperar el final del proceso hijo
-        if (waitpid(pid, &status, 0) == -1)
-            return ERROR_500;
+		std::cerr << "Error: executing CGI script: " << strerror(errno) << std::endl;
+		exit(1); // If execve fails
+	}
+	else
+	{
+		close(pipefd[1]); // Close writing in the parent
 
-        // Manejar el código de salida del CGI
-        if (WIFEXITED(status))
-        {
-            int exitStatus = WEXITSTATUS(status);
-            if (exitStatus == 2) // CGI script no encontrado
-                return ERROR_404;
-            else if (exitStatus == 3) // CGI script no ejecutable
-                return ERROR_403;
-            else if (exitStatus == 1) // Error ejecutando el CGI
-                return ERROR_500;
-        }
+		// TOTALLY NECESSARY FOR THE PIPES HERE: Set the read end of the pipe to non-blocking mode
+		int flags = fcntl(pipefd[0], F_GETFL, 0);
+		fcntl(pipefd[0], F_SETFL, flags | O_NONBLOCK);
 
-        if (WIFSIGNALED(status))
-            return ERROR_500;
+		char buffer[1024];
+		ssize_t bytesRead;
+		int status;
+		int timeoutCounter = 0;
+		const int maxTimeout = 5000; // 5 seconds (5000 * 1ms)
+		bool childExited = false;
 
-        // Si el CGI no retornó nada
-        if (this->_cgiBody.empty())
-            return ERROR_500;
-        else
-            return SUCCESS_200;
-    }
+		while (!childExited && timeoutCounter < maxTimeout)
+		{
+			pid_t result = waitpid(pid, &status, WNOHANG);
+			if (result == 0) // Child is still running
+			{
+				bytesRead = read(pipefd[0], buffer, sizeof(buffer));
+				if (bytesRead > 0)
+				{
+					this->_cgiBody.append(buffer, bytesRead);
+					timeoutCounter = 0; // Reset timeout counter on successful read
+				}
+				else // No data available or read would block
+				{
+					timeoutCounter++;
+					usleep(1000); // Wait for 1ms
+				}
+			}
+			else if (result > 0)
+				childExited = true;
+			else // waitpid error
+			{
+				close(pipefd[0]);
+				return ERROR_500;
+			}
+		}
 
-    return NO_STATUS_CODE; // Imposible llegar aquí
+		if (!childExited) // Timeout occurred
+		{
+			kill(pid, SIGKILL);
+			waitpid(pid, NULL, 0);
+			close(pipefd[0]);
+			return ERROR_408;
+		}
+
+		// Read any remaining data from the pipe
+		while ((bytesRead = read(pipefd[0], buffer, sizeof(buffer))) > 0)
+			this->_cgiBody.append(buffer, bytesRead);
+
+		close(pipefd[0]);
+
+		if (WIFEXITED(status))
+		{
+			int exitStatus = WEXITSTATUS(status);
+			if (exitStatus == 2) // CGI script not found
+				return ERROR_404;
+			else if (exitStatus == 3) // CGI script not executable
+				return ERROR_403;
+		}
+		else if (WIFSIGNALED(status))
+			return ERROR_500;
+
+		if (this->_cgiBody.empty())
+			return ERROR_500;
+		else
+			return SUCCESS_200;
+	}
+
+	return NO_STATUS_CODE;
 }
-
 
 StatusCode Response::_handleGET()
 {
