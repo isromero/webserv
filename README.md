@@ -1,5 +1,5 @@
 
-# 🌐 Webserv - HTTP Server from Scratch
+# 🌐 Webserv - HTTP Server in C++
 
 Welcome to the Webserv project, part of the 42 Network curriculum. In this project, we develop our own HTTP server from scratch, following the specifications of the HTTP/1.1 protocols and some additional functionalities like CGI. This project is fundamental for understanding the operation of web servers and network communication protocols.
 
