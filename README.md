@@ -1,6 +1,3 @@
-# 🌐 Webserv - HTTP Server from Scratch
-
-Bienvenidos al proyecto **Webserv**, parte del currículo de 42 Network. En este proyecto, desarrollamos nuestro propio servidor HTTP desde cero, siguiendo las especificaciones de los protocolos HTTP/1.1 y algunas funcionalidades adicionales como CGI. Este proyecto es fundamental para comprender el funcionamiento de los servidores web y los protocolos de comunicación en red.
 
 # 🌐 Webserv - HTTP Server from Scratch
 
